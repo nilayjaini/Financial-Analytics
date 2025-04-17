@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import matplotlib.pyplot as plt
+from textblob import TextBlob
+from datetime import datetime
 
 st.set_page_config(page_title="Valuation Explorer", layout="centered")
 st.title(":moneybag: Stock Valuation Dashboard")
@@ -100,3 +102,52 @@ if ticker_symbol:
 
     except Exception as e:
         st.error(f"Error: {e}")
+
+
+st.subheader("📰 Recent News & Sentiment Analysis")
+
+def get_sentiment(text):
+    try:
+        return TextBlob(text).sentiment.polarity  # -1 to 1
+    except:
+        return 0
+
+def format_time(unix_time):
+    return datetime.fromtimestamp(unix_time).strftime('%Y-%m-%d %H:%M')
+
+news_items = stock.news[:10]  # Limit to top 10 for performance
+
+if not news_items:
+    st.warning("No recent news found for this ticker.")
+else:
+    sentiment_scores = []
+    st.markdown("### 🧾 Headlines (with keyword highlights)")
+    for item in news_items:
+        title = item.get("title", "")
+        link = item.get("link", "#")
+        publisher = item.get("publisher", "")
+        publish_time = format_time(item.get("providerPublishTime", 0))
+        score = get_sentiment(title)
+        sentiment_scores.append(score)
+
+        # Highlight relevant headlines
+        highlight_keywords = ['earnings', 'guidance', 'forecast', 'merger', 'layoffs', 'revenue', 'profit']
+        highlight = any(k in title.lower() for k in highlight_keywords)
+        icon = "🔔" if highlight else "📰"
+
+        st.markdown(f"{icon} [{title}]({link})  `{publisher}` — *{publish_time}*")
+
+    # Aggregate sentiment
+    avg_sentiment = sum(sentiment_scores) / len(sentiment_scores)
+    if avg_sentiment > 0.2:
+        summary = "📈 Overall Sentiment: **Positive**"
+    elif avg_sentiment < -0.2:
+        summary = "📉 Overall Sentiment: **Negative**"
+    else:
+        summary = "➖ Overall Sentiment: **Neutral**"
+
+    st.markdown("---")
+    st.subheader("🧠 Headline Sentiment Summary")
+    st.metric(label="Average Sentiment Score", value=f"{avg_sentiment:.2f}")
+    st.markdown(summary)
+
