@@ -11,7 +11,7 @@ def get_peers(ticker_symbol):
     "AAPL": ["MSFT", "GOOGL", "DELL", "HPQ"],
     "MSFT": ["AAPL", "GOOGL", "ORCL", "IBM"],
     "GOOGL": ["MSFT", "META", "AAPL", "AMZN"],
-    "DELL": ["HPQ", "AAPL", "LENOVO"],  # Lenovo not traded in US, use if needed
+    "DELL": ["HPQ", "AAPL"],  
     "HPQ": ["DELL", "AAPL"],
 
     # 📺 Media & Streaming
