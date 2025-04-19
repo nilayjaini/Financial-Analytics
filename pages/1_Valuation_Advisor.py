@@ -13,8 +13,11 @@ if ticker_input:
         st.markdown(f"**Sector:** {sector}  \n**Industry:** {industry}  \n**Peers:** {', '.join(peers)}")
         result = analyze_valuation(ticker_input.upper(), peers)
         
-        st.metric("EPS (TTM)", f"{result['eps']:.2f}" if result['eps'] else "N/A")
+        st.metric("EPS (TTM)", f"{result['eps']:.2f}")
         st.metric("Industry Avg P/E", f"{result['industry_pe_avg']:.2f}")
+        st.metric("Current Stock Price", f"${result['current_price']:.2f}" if result['current_price'] else "N/A")
+
+
         
         st.subheader("Recommendation")
         st.success(result['recommendation'])
