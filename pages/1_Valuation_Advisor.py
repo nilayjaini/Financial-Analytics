@@ -4,7 +4,11 @@ from helpers.valuation_logic import analyze_valuation, plot_peers, plot_price_ra
 
 st.title("📊 Valuation & Recommendation")
 
-ticker_input = st.text_input("Enter a ticker symbol", "TGT")
+col1, col2 = st.columns(2)
+ticker_input = col1.text_input("Enter primary ticker", "TGT")
+compare_input = col2.text_input("Compare with (optional)", "")
+
+
 
 if ticker_input:
     peers, sector, industry = get_peers(ticker_input.upper())
