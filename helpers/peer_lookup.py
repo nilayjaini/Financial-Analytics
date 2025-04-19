@@ -1,3 +1,16 @@
+from textblob import TextBlob
+
+def get_recent_news_sentiment(ticker):
+    news = yf.Ticker(ticker).news
+    sentiments = []
+
+    for article in news[:5]:
+        title = article.get("title", "")
+        sentiment = TextBlob(title).sentiment.polarity
+        sentiments.append((title, sentiment))
+
+    return sentiments
+
 def get_peers(ticker_symbol):
     static_peers = {
     # 🛒 Retail
