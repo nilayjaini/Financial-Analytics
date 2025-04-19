@@ -15,10 +15,16 @@ if ticker_input:
         st.markdown(f"**Sector:** {sector}  \n**Industry:** {industry}  \n**Peers:** {', '.join(peers)}")
         result = analyze_valuation(ticker_input.upper(), peers)
 
+
         st.metric("EPS (TTM)", f"{result['eps']:.2f}" if result['eps'] else "N/A")
         st.metric("Industry Avg P/E", f"{result['industry_pe_avg']:.2f}")
-        st.metric("Implied Price", f"${result['implied_price']:.2f}" if result['implied_price'] else "N/A")
+        st.metric("Min P/E (Peers)", f"{result['min_pe']:.2f}")
+        st.metric("Max P/E (Peers)", f"{result['max_pe']:.2f}")
+        
+        st.metric("Implied Price (Low-End)", f"${result['implied_price_min']:.2f}" if result['implied_price_min'] else "N/A")
+        st.metric("Implied Price (High-End)", f"${result['implied_price_max']:.2f}" if result['implied_price_max'] else "N/A")
         st.metric("Current Price", f"${result['current_price']:.2f}")
+
         
         st.subheader("Recommendation")
         st.success(result['recommendation'])
