@@ -29,3 +29,10 @@ plot_price_range(
     result['implied_price_max'],
     result['implied_price']
 )
+# Dynamic gap commentary
+if result['implied_price']:
+    gap = ((result['implied_price'] - result['current_price']) / result['implied_price']) * 100
+    if gap > 0:
+        st.caption(f"📉 Current price is **{gap:.1f}% below** peer-based valuation average.")
+    else:
+        st.caption(f"📈 Current price is **{abs(gap):.1f}% above** peer-based valuation average.")
