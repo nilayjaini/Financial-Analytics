@@ -64,7 +64,7 @@ def plot_peers(peers_dict, highlight):
 
 
 def plot_price_range(current, min_price, max_price, avg_price):
-    fig, ax = plt.subplots(figsize=(8, 1.5))
+    fig, ax = plt.subplots(figsize=(6, 1.2))  # Smaller figure
 
     # Draw range
     ax.plot([min_price, max_price], [0, 0], color="gray", linewidth=10, alpha=0.3)
@@ -78,11 +78,16 @@ def plot_price_range(current, min_price, max_price, avg_price):
     ax.text(current, -0.25, f"Current: ${current:.2f}", ha='center', fontsize=9, color='red')
 
     # Range labels
-    ax.text(min_price, 0.15, f"Low: ${min_price:.2f}", ha='left', fontsize=9)
-    ax.text(max_price, 0.15, f"High: ${max_price:.2f}", ha='right', fontsize=9)
+    ax.text(avg_price, 0.18, f"Avg: ${avg_price:.2f}", ha='center', fontsize=8)
+    ax.text(current, -0.18, f"Current: ${current:.2f}", ha='center', fontsize=8, color='red')
+    ax.text(min_price, 0.12, f"Low: ${min_price:.2f}", ha='left', fontsize=8)
+    ax.text(max_price, 0.12, f"High: ${max_price:.2f}", ha='right', fontsize=8)
+
 
     ax.set_xlim(min_price * 0.95, max_price * 1.05)
     ax.axis('off')
     st.pyplot(fig)
+
+
 
 
