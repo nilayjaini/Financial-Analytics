@@ -71,11 +71,9 @@ def plot_price_range(current, min_price, max_price, avg_price):
 
     # Average line
     ax.plot([avg_price, avg_price], [-0.1, 0.1], color="blue", linewidth=2)
-    ax.text(avg_price, 0.2, f"Avg: ${avg_price:.2f}", ha='center', fontsize=9)
 
     # Current price marker
     ax.plot(current, 0, marker='o', color="red", markersize=10)
-    ax.text(current, -0.25, f"Current: ${current:.2f}", ha='center', fontsize=9, color='red')
 
     # Range labels
     ax.text(avg_price, 0.18, f"Avg: ${avg_price:.2f}", ha='center', fontsize=8)
@@ -87,7 +85,3 @@ def plot_price_range(current, min_price, max_price, avg_price):
     ax.set_xlim(min_price * 0.95, max_price * 1.05)
     ax.axis('off')
     st.pyplot(fig)
-
-
-
-
