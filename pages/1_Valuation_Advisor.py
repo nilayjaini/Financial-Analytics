@@ -53,7 +53,11 @@ if ticker_input:
             }
             interval_label = st.selectbox("📈 Select Time Range", list(interval_map.keys()), index=0)
             selected_interval = interval_map[interval_label]
-            hist = ticker.history(period=selected_interval)
+            if selected_interval == "1d":
+                hist = ticker.history(period="1d", interval="5m")
+            else:
+                hist = ticker.history(period=selected_interval)
+            
 
             # Plotly Chart
             fig = go.Figure()
