@@ -3,6 +3,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 from helpers.peer_lookup import get_peers
 from helpers.valuation_logic import analyze_valuation, plot_price_range
+import urllib.parse
 
 st.set_page_config(layout="wide")
 st.title("📈 Stock Insight Explorer")
@@ -24,10 +25,18 @@ if ticker_input:
             company_name = stock_info.get("longName", ticker_input.upper())
             logo = stock_info.get("logo_url")
 
+            company_name = stock_info.get("longName", ticker_input.upper())
+            logo = stock_info.get("logo_url")
+            website = stock_info.get("website", "")
+            domain = urllib.parse.urlparse(website).netloc
+            clearbit_logo = f"https://logo.clearbit.com/{domain}" if domain else None
+
             col1, col2 = st.columns([1, 10])
-            if logo:
-                with col1:
+            with col1:
+                if logo:
                     st.image(logo, width=50)
+                elif clearbit_logo:
+                    st.image(clearbit_logo, width=50)
             with col2:
                 st.subheader(f"{company_name} ({ticker_input.upper()})")
 
