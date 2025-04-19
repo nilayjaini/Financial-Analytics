@@ -41,6 +41,5 @@ if ticker_input:
                 st.caption(f"📉 Current price is **{gap:.1f}% below** peer-based valuation average.")
             else:
                 st.caption(f"📈 Current price is **{abs(gap):.1f}% above** peer-based valuation average.")
-
     else:
-        st.warning("⚠️ Could not fetch peer data
+        st.warning("⚠️ Could not fetch peer data.")
