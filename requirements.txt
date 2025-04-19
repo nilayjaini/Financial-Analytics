@@ -5,4 +5,5 @@ matplotlib
 textblob
 beautifulsoup4
 requests
+textblob
 
