@@ -7,7 +7,8 @@ st.title("📊 Valuation & Recommendation")
 ticker_input = st.text_input("Enter a ticker symbol", "TGT")
 
 if ticker_input:
-    peers = static_peers.get(ticker_symbol.upper(), [])
+    peers, sector, industry = get_peers(ticker_input.upper())
+
 
     
     if peers:
