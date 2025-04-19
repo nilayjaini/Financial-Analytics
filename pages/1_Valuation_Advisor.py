@@ -15,96 +15,92 @@ if ticker_input:
 
     # ========== OVERVIEW ==========
     with tab1:
-    st.header(f"Overview: {ticker_input.upper()}")
+        st.header(f"Overview: {ticker_input.upper()}")
 
-    try:
-        stock_info = ticker.info
+        try:
+            stock_info = ticker.info
 
-        # Header
-        company_name = stock_info.get("longName", ticker_input.upper())
-        st.subheader(f"{company_name} ({ticker_input.upper()})")
+            # Header
+            company_name = stock_info.get("longName", ticker_input.upper())
+            st.subheader(f"{company_name} ({ticker_input.upper()})")
 
-        # Interval dropdown
-        interval_map = {
-            "1 Day": "1d",
-            "5 Days": "5d",
-            "1 Month": "1mo",
-            "6 Months": "6mo",
-            "YTD": "ytd",
-            "1 Year": "1y",
-            "5 Years": "5y",
-            "Max": "max"
-        }
-        interval_label = st.selectbox("📈 Select Time Range", list(interval_map.keys()), index=0)
-        selected_interval = interval_map[interval_label]
+            # Interval dropdown
+            interval_map = {
+                "1 Day": "1d",
+                "5 Days": "5d",
+                "1 Month": "1mo",
+                "6 Months": "6mo",
+                "YTD": "ytd",
+                "1 Year": "1y",
+                "5 Years": "5y",
+                "Max": "max"
+            }
+            interval_label = st.selectbox("📈 Select Time Range", list(interval_map.keys()), index=0)
+            selected_interval = interval_map[interval_label]
 
-        hist = ticker.history(period=selected_interval)
+            hist = ticker.history(period=selected_interval)
+            st.line_chart(hist["Close"])
 
-        # Chart
-        st.line_chart(hist["Close"])
+            # Financial metrics
+            price = stock_info.get("regularMarketPrice", 0)
+            open_price = stock_info.get("open", 0)
+            high = stock_info.get("dayHigh", 0)
+            low = stock_info.get("dayLow", 0)
+            market_cap = stock_info.get("marketCap", 0)
+            pe_ratio = stock_info.get("trailingPE", "N/A")
+            div_yield = stock_info.get("dividendYield", 0)
+            week52_high = stock_info.get("fiftyTwoWeekHigh", "N/A")
+            week52_low = stock_info.get("fiftyTwoWeekLow", "N/A")
 
-        # Financial metrics
-        price = stock_info.get("regularMarketPrice", 0)
-        open_price = stock_info.get("open", 0)
-        high = stock_info.get("dayHigh", 0)
-        low = stock_info.get("dayLow", 0)
-        market_cap = stock_info.get("marketCap", 0)
-        pe_ratio = stock_info.get("trailingPE", "N/A")
-        div_yield = stock_info.get("dividendYield", 0)
-        week52_high = stock_info.get("fiftyTwoWeekHigh", "N/A")
-        week52_low = stock_info.get("fiftyTwoWeekLow", "N/A")
+            # Grid-style layout
+            st.markdown("### 🧾 Key Financials")
+            st.markdown("""
+                <style>
+                    .metric-table {
+                        display: grid;
+                        grid-template-columns: repeat(4, 1fr);
+                        gap: 10px;
+                        padding: 10px;
+                        border: 1px solid #eee;
+                        background-color: #fff;
+                        border-radius: 8px;
+                        margin-bottom: 1rem;
+                    }
+                    .metric-item {
+                        border: 1px solid #ddd;
+                        border-radius: 6px;
+                        padding: 10px;
+                        text-align: center;
+                        font-size: 14px;
+                        background-color: #fafafa;
+                    }
+                    .metric-item b {
+                        font-size: 16px;
+                    }
+                </style>
+            """, unsafe_allow_html=True)
 
-        # Show as table-style grid with borders
-        st.markdown("### 🧾 Key Financials")
-        st.markdown("""
-            <style>
-                .metric-table {
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 10px;
-                    padding: 10px;
-                    border: 1px solid #eee;
-                    background-color: #fff;
-                    border-radius: 8px;
-                    margin-bottom: 1rem;
-                }
-                .metric-item {
-                    border: 1px solid #ddd;
-                    border-radius: 6px;
-                    padding: 10px;
-                    text-align: center;
-                    font-size: 14px;
-                    background-color: #fafafa;
-                }
-                .metric-item b {
-                    font-size: 16px;
-                }
-            </style>
-        """, unsafe_allow_html=True)
+            st.markdown(f"""
+                <div class="metric-table">
+                    <div class="metric-item"><b>Open</b><br>${open_price:.2f}</div>
+                    <div class="metric-item"><b>High</b><br>${high:.2f}</div>
+                    <div class="metric-item"><b>Low</b><br>${low:.2f}</div>
+                    <div class="metric-item"><b>Current</b><br>${price:.2f}</div>
+                    <div class="metric-item"><b>Mkt Cap</b><br>${market_cap/1e9:.2f}B</div>
+                    <div class="metric-item"><b>P/E Ratio</b><br>{pe_ratio}</div>
+                    <div class="metric-item"><b>Div Yield</b><br>{div_yield*100:.2f}%</div>
+                    <div class="metric-item"><b>52-wk High</b><br>${week52_high}</div>
+                    <div class="metric-item"><b>52-wk Low</b><br>${week52_low}</div>
+                </div>
+            """, unsafe_allow_html=True)
 
-        st.markdown(f"""
-            <div class="metric-table">
-                <div class="metric-item"><b>Open</b><br>${open_price:.2f}</div>
-                <div class="metric-item"><b>High</b><br>${high:.2f}</div>
-                <div class="metric-item"><b>Low</b><br>${low:.2f}</div>
-                <div class="metric-item"><b>Current</b><br>${price:.2f}</div>
-                <div class="metric-item"><b>Mkt Cap</b><br>${market_cap/1e9:.2f}B</div>
-                <div class="metric-item"><b>P/E Ratio</b><br>{pe_ratio}</div>
-                <div class="metric-item"><b>Div Yield</b><br>{div_yield*100:.2f}%</div>
-                <div class="metric-item"><b>52-wk High</b><br>${week52_high}</div>
-                <div class="metric-item"><b>52-wk Low</b><br>${week52_low}</div>
-            </div>
-        """, unsafe_allow_html=True)
+            st.markdown("### 🏢 Company Overview")
+            st.info(stock_info.get("longBusinessSummary", "No description available."))
+            st.caption("📌 Data powered by Yahoo Finance")
 
-        # Company Description
-        st.markdown("### 🏢 Company Overview")
-        st.info(stock_info.get("longBusinessSummary", "No description available."))
-
-        st.caption("📌 Data powered by Yahoo Finance")
-
-    except Exception as e:
-        st.error("Could not load overview data.")
-        st.exception(e)
+        except Exception as e:
+            st.error("Could not load overview data.")
+            st.exception(e)
 
     # ========== RECOMMENDATIONS ==========
     with tab2:
