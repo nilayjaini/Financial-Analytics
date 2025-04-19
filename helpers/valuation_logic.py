@@ -85,3 +85,13 @@ def plot_price_range(current, min_price, max_price, avg_price):
     ax.set_xlim(min_price * 0.95, max_price * 1.05)
     ax.axis('off')
     st.pyplot(fig)
+
+
+# Dynamic gap commentary
+if result['implied_price']:
+    gap = ((result['implied_price'] - result['current_price']) / result['implied_price']) * 100
+    if gap > 0:
+        st.caption(f"📉 Current price is **{gap:.1f}% below** peer-based valuation average.")
+    else:
+        st.caption(f"📈 Current price is **{abs(gap):.1f}% above** peer-based valuation average.")
+
