@@ -1,3 +1,4 @@
+# 1_Company_Snapshot.py
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
@@ -12,89 +13,63 @@ if ticker_input:
     ticker = yf.Ticker(ticker_input.upper())
 
     try:
-        stock_info = ticker.info
-
-        # Header Info
-        company_name = stock_info.get("longName", ticker_input.upper())
-        website = stock_info.get("website", "")
+        info = ticker.info
+        company_name = info.get("longName", ticker_input.upper())
+        website = info.get("website", "")
         domain = urllib.parse.urlparse(website).netloc
-        clearbit_logo = f"https://logo.clearbit.com/{domain}" if domain else None
+        logo = info.get("logo_url") or f"https://logo.clearbit.com/{domain}" if domain else None
 
         col1, col2 = st.columns([1, 10])
         with col1:
-            if clearbit_logo:
-                st.image(clearbit_logo, width=50)
+            if logo:
+                st.image(logo, width=50)
         with col2:
             st.subheader(f"{company_name} ({ticker_input.upper()})")
 
-        # Interval selector
         interval_map = {
-            "1 Day": "1d",
-            "5 Days": "5d",
-            "1 Month": "1mo",
-            "6 Months": "6mo",
-            "YTD": "ytd",
-            "1 Year": "1y",
-            "5 Years": "5y",
-            "Max": "max"
+            "1 Day": "1d", "5 Days": "5d", "1 Month": "1mo", "6 Months": "6mo",
+            "YTD": "ytd", "1 Year": "1y", "5 Years": "5y", "Max": "max"
         }
         interval_label = st.selectbox("📈 Select Time Range", list(interval_map.keys()), index=0)
         selected_interval = interval_map[interval_label]
-
-        # Historical price chart
-        if selected_interval == "1d":
-            hist = ticker.history(period="1d", interval="5m")
-        else:
-            hist = ticker.history(period=selected_interval)
+        hist = ticker.history(period="1d", interval="5m") if selected_interval == "1d" else ticker.history(period=selected_interval)
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode='lines', name='Close'))
-        fig.update_layout(title=f"{ticker_input.upper()} Stock Price - {interval_label}",
-                          xaxis_title="Date", yaxis_title="Price ($)", height=350)
+        fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode='lines', name='Close Price'))
+        fig.update_layout(title=f"{ticker_input.upper()} Stock Price - {interval_label}", height=350, xaxis_title="Date", yaxis_title="Price ($)")
         st.plotly_chart(fig, use_container_width=True)
 
-        # Key Financials
         st.markdown("### 🧾 Key Financials")
-        open_price = stock_info.get("open", 0)
-        high = stock_info.get("dayHigh", 0)
-        low = stock_info.get("dayLow", 0)
-        price = stock_info.get("regularMarketPrice", 0)
-        market_cap = stock_info.get("marketCap", 0)
-        pe_ratio = stock_info.get("trailingPE", "N/A")
-        div_yield = stock_info.get("dividendYield")
-        div_yield_display = f"{div_yield*100:.2f}%" if div_yield and div_yield < 1 else "N/A"
-        week52_high = stock_info.get("fiftyTwoWeekHigh", "N/A")
-        week52_low = stock_info.get("fiftyTwoWeekLow", "N/A")
-        earnings_date = stock_info.get("earningsDate", ["N/A"])[0]
+        def safe_fmt(val, pct=False):
+            if val is None or val == "N/A": return "N/A"
+            return f"{val*100:.2f}%" if pct else f"${val:.2f}" if isinstance(val, (int, float)) else val
+
+        grid_data = [
+            ("Open", safe_fmt(info.get("open"))),
+            ("High", safe_fmt(info.get("dayHigh"))),
+            ("Low", safe_fmt(info.get("dayLow"))),
+            ("Current", safe_fmt(info.get("regularMarketPrice"))),
+            ("Mkt Cap", f"${info.get('marketCap',0)/1e9:.2f}B"),
+            ("P/E Ratio", info.get("trailingPE", "N/A")),
+            ("Div Yield", safe_fmt(info.get("dividendYield"), pct=True)),
+            ("52-wk High", safe_fmt(info.get("fiftyTwoWeekHigh"))),
+            ("52-wk Low", safe_fmt(info.get("fiftyTwoWeekLow")))
+        ]
 
         st.markdown("""
-            <style>
-            .metric-table { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px; }
-            .metric-item { border: 1px solid #ddd; border-radius: 6px; padding: 10px; text-align: center; background-color: #fafafa; }
-            .metric-item b { font-size: 16px; }
-            </style>
-        """, unsafe_allow_html=True)
-
-        st.markdown(f"""
-            <div class="metric-table">
-                <div class="metric-item"><b>Open</b><br>${open_price:.2f}</div>
-                <div class="metric-item"><b>High</b><br>${high:.2f}</div>
-                <div class="metric-item"><b>Low</b><br>${low:.2f}</div>
-                <div class="metric-item"><b>Current</b><br>${price:.2f}</div>
-                <div class="metric-item"><b>Mkt Cap</b><br>${market_cap/1e9:.2f}B</div>
-                <div class="metric-item"><b>P/E Ratio</b><br>{pe_ratio}</div>
-                <div class="metric-item"><b>Div Yield</b><br>{div_yield_display}</div>
-                <div class="metric-item"><b>52-wk High</b><br>${week52_high}</div>
-                <div class="metric-item"><b>52-wk Low</b><br>${week52_low}</div>
-            </div>
-        """, unsafe_allow_html=True)
+        <style>
+            .metric-table {display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; border: 1px solid #eee; border-radius: 8px;}
+            .metric-item {border: 1px solid #ddd; border-radius: 6px; padding: 10px; text-align: center; font-size: 14px; background: #fafafa;}
+            .metric-item b {font-size: 16px;}
+        </style>""", unsafe_allow_html=True)
+        html = "<div class='metric-table'>" + "".join([f"<div class='metric-item'><b>{k}</b><br>{v}</div>" for k,v in grid_data]) + "</div>"
+        st.markdown(html, unsafe_allow_html=True)
 
         st.markdown("### 🏢 Company Overview")
-        st.info(stock_info.get("longBusinessSummary", "No description available."))
-
-        st.markdown(f"📅 **Next Earnings Date**: {earnings_date}")
+        st.info(info.get("longBusinessSummary", "No description available."))
+        st.markdown(f"📅 **Next Earnings Date**: {info.get('earningsDate', ['N/A'])[0]}")
         st.caption("📌 Data powered by Yahoo Finance")
 
     except Exception as e:
-        st.error("Could not load data")
+        st.error("Could not load company data.")
         st.exception(e)
