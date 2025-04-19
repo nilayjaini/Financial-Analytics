@@ -1,4 +1,5 @@
 from textblob import TextBlob
+import yfinance as yf
 
 def get_recent_news_sentiment(ticker):
     news = yf.Ticker(ticker).news
@@ -10,6 +11,7 @@ def get_recent_news_sentiment(ticker):
         sentiments.append((title, sentiment))
 
     return sentiments
+
 
 def get_peers(ticker_symbol):
     static_peers = {
