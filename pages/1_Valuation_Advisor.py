@@ -15,9 +15,7 @@ if ticker_input:
         
         st.metric("EPS (TTM)", f"{result['eps']:.2f}")
         st.metric("Industry Avg P/E", f"{result['industry_pe_avg']:.2f}")
-        st.metric("Current Stock Price", f"${result['current_price']:.2f}" if result['current_price'] else "N/A")
-
-
+        st.metric("Current Stock Price", f"${result['current_price']:.2f}")
         
         st.subheader("Recommendation")
         st.success(result['recommendation'])
