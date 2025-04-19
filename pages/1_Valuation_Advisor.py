@@ -1,6 +1,7 @@
 import streamlit as st
 from helpers.peer_lookup import get_peers
-from helpers.valuation_logic import analyze_valuation, plot_peers
+from helpers.valuation_logic import analyze_valuation, plot_peers, plot_price_range
+
 
 st.title("📊 Valuation & Recommendation")
 
@@ -34,5 +35,13 @@ if ticker_input:
 
     else:
         st.warning("Could not fetch peer data.")
+
+st.subheader("📉 Valuation Range Visualization")
+plot_price_range(
+    result['current_price'],
+    result['implied_price_min'],
+    result['implied_price_max'],
+    result['implied_price']
+)
 
 
