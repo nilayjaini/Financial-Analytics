@@ -1,8 +1,10 @@
 import streamlit as st
 import yfinance as yf
+import plotly.graph_objects as go
 from helpers.peer_lookup import get_peers
 from helpers.valuation_logic import analyze_valuation, plot_price_range
 
+st.set_page_config(layout="wide")
 st.title("📈 Stock Insight Explorer")
 
 ticker_input = st.text_input("Enter a ticker symbol", "DELL")
@@ -15,14 +17,19 @@ if ticker_input:
 
     # ========== OVERVIEW ==========
     with tab1:
-        st.header(f"Overview: {ticker_input.upper()}")
-
         try:
             stock_info = ticker.info
 
             # Header
             company_name = stock_info.get("longName", ticker_input.upper())
-            st.subheader(f"{company_name} ({ticker_input.upper()})")
+            logo = stock_info.get("logo_url")
+
+            col1, col2 = st.columns([1, 10])
+            if logo:
+                with col1:
+                    st.image(logo, width=50)
+            with col2:
+                st.subheader(f"{company_name} ({ticker_input.upper()})")
 
             # Interval dropdown
             interval_map = {
@@ -37,9 +44,14 @@ if ticker_input:
             }
             interval_label = st.selectbox("📈 Select Time Range", list(interval_map.keys()), index=0)
             selected_interval = interval_map[interval_label]
-
             hist = ticker.history(period=selected_interval)
-            st.line_chart(hist["Close"])
+
+            # Plotly Chart
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode='lines', name='Close Price'))
+            fig.update_layout(title=f"{ticker_input.upper()} Stock Price - {interval_label}",
+                              xaxis_title="Date", yaxis_title="Price ($)", height=350)
+            st.plotly_chart(fig, use_container_width=True)
 
             # Financial metrics
             price = stock_info.get("regularMarketPrice", 0)
@@ -48,9 +60,11 @@ if ticker_input:
             low = stock_info.get("dayLow", 0)
             market_cap = stock_info.get("marketCap", 0)
             pe_ratio = stock_info.get("trailingPE", "N/A")
-            div_yield = stock_info.get("dividendYield", 0)
+            div_yield = stock_info.get("dividendYield")
+            div_yield_display = f"{div_yield*100:.2f}%" if div_yield and div_yield < 1 else "N/A"
             week52_high = stock_info.get("fiftyTwoWeekHigh", "N/A")
             week52_low = stock_info.get("fiftyTwoWeekLow", "N/A")
+            earnings_date = stock_info.get("earningsDate", ["N/A"])[0]
 
             # Grid-style layout
             st.markdown("### 🧾 Key Financials")
@@ -88,7 +102,7 @@ if ticker_input:
                     <div class="metric-item"><b>Current</b><br>${price:.2f}</div>
                     <div class="metric-item"><b>Mkt Cap</b><br>${market_cap/1e9:.2f}B</div>
                     <div class="metric-item"><b>P/E Ratio</b><br>{pe_ratio}</div>
-                    <div class="metric-item"><b>Div Yield</b><br>{div_yield*100:.2f}%</div>
+                    <div class="metric-item"><b>Div Yield</b><br>{div_yield_display}</div>
                     <div class="metric-item"><b>52-wk High</b><br>${week52_high}</div>
                     <div class="metric-item"><b>52-wk Low</b><br>${week52_low}</div>
                 </div>
@@ -96,6 +110,8 @@ if ticker_input:
 
             st.markdown("### 🏢 Company Overview")
             st.info(stock_info.get("longBusinessSummary", "No description available."))
+
+            st.markdown(f"📅 **Next Earnings Date**: {earnings_date}")
             st.caption("📌 Data powered by Yahoo Finance")
 
         except Exception as e:
