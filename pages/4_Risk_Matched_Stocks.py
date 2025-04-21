@@ -57,6 +57,18 @@ if ticker_input:
             st.dataframe(result_df, use_container_width=True)
             st.caption("Matched based on similarity in Beta, Market Cap, and P/B Ratio.")
 
+            # Generate recommendations based on similarity
+            st.markdown("### 💡 Analyst Insight")
+            recommendations = []
+            for _, row in result_df.iterrows():
+                if row["Distance"] < 1:
+                    rec = f"🔹 **{row['Ticker']}** has a very close risk profile and can be a potential alternative if you're looking to diversify without drastically altering your portfolio risk exposure."
+                else:
+                    rec = f"🔹 **{row['Ticker']}** is somewhat similar in risk profile but may differ more significantly on one or more dimensions. Review fundamentals before substituting."
+                recommendations.append(rec)
+            for rec in recommendations:
+                st.markdown(rec)
+
     except Exception as e:
         st.error("Failed to compute risk-matched stocks.")
         st.exception(e)
