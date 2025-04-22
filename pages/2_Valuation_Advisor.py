@@ -1,5 +1,5 @@
 import streamlit as st
-from helpers.peer_lookup import get_peers
+from helpers.peer_lookup import get_dynamic_peers
 from helpers.valuation_logic import analyze_valuation, plot_price_range
 
 st.set_page_config(layout="wide")
@@ -8,8 +8,8 @@ st.title("💸 Valuation Advisor")
 ticker_input = st.text_input("Enter a ticker symbol", "DELL")
 
 if ticker_input:
-    peers, sector, industry = get_peers(ticker_input.upper())
-
+    #peers, sector, industry = get_peers(ticker_input.upper())
+    peers = get_dynamic_peers(ticker_input)
     st.markdown(f"**Sector:** {sector}  ")
     st.markdown(f"**Industry:** {industry}  ")
     st.markdown(f"**Peers:** {', '.join(peers) if peers else 'N/A'}")
