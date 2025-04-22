@@ -1,93 +1,100 @@
-import yfinance as yf
-import matplotlib.pyplot as plt
+# helpers/peer_lookup.py
+import requests
 import streamlit as st
+from bs4 import BeautifulSoup
+from functools import lru_cache
 
-def analyze_valuation(ticker_symbol, peers):
-    all_pe_ratios = {}
-    eps = None
+# SEC requires a descriptive User-Agent
+HEADERS = {
+    "User-Agent": "Your Name your_email@example.com",
+    "Accept-Encoding": "gzip, deflate",
+    "Host": "www.sec.gov",
+}
 
-    tickers = [ticker_symbol] + peers
-    for t in tickers:
-        try:
-            info = yf.Ticker(t).info
-            pe = info.get("trailingPE", None)
-            eps_val = info.get("trailingEps", None)
-            if t == ticker_symbol:
-                eps = eps_val
-            if pe is not None and pe > 0:
-                all_pe_ratios[t] = pe
-        except Exception as e:
-            print(f"Failed to fetch info for {t}: {e}")
-
-    if not all_pe_ratios or eps is None:
-        return {
-            "peers": {},
-            "eps": eps,
-            "industry_pe_avg": None,
-            "min_pe": None,
-            "max_pe": None,
-            "implied_price": None,
-            "implied_price_min": None,
-            "implied_price_max": None,
-            "current_price": None,
-            "recommendation": "⚠️ Data unavailable for valuation."
-        }
-
-    pe_values = list(all_pe_ratios.values())
-    industry_pe_avg = sum(pe_values) / len(pe_values)
-    min_pe = min(pe_values)
-    max_pe = max(pe_values)
-
-    implied_price = industry_pe_avg * eps if eps else None
-    implied_price_min = min_pe * eps if eps else None
-    implied_price_max = max_pe * eps if eps else None
-
-    try:
-        current_price = yf.Ticker(ticker_symbol).history(period="1d")['Close'][-1]
-    except:
-        current_price = None
-
-    if implied_price and current_price:
-        if current_price < 0.95 * implied_price:
-            decision = "✅ Likely Undervalued — Consider Buying"
-        elif current_price > 1.1 * implied_price:
-            decision = "❌ Overvalued Compared to Peers"
-        else:
-            decision = "🤔 Fairly Priced — Hold or Watch"
-    else:
-        decision = "⚠️ EPS or P/E unavailable"
-
+@lru_cache()
+def load_ticker_cik_map():
+    """
+    Loads the SEC's master ticker -> CIK mapping.
+    Returns { 'AAPL': '0000320193', ... }
+    """
+    url = "https://www.sec.gov/files/company_tickers.json"
+    r = requests.get(url, headers=HEADERS)
+    r.raise_for_status()
+    data = r.json()
+    # the JSON is keyed by integer strings, with values { ticker, cik_str, ... }
     return {
-        "peers": all_pe_ratios,
-        "eps": eps,
-        "industry_pe_avg": industry_pe_avg,
-        "min_pe": min_pe,
-        "max_pe": max_pe,
-        "implied_price": implied_price,
-        "implied_price_min": implied_price_min,
-        "implied_price_max": implied_price_max,
-        "current_price": current_price,
-        "recommendation": decision
+        val["ticker"].upper(): val["cik_str"].zfill(10)
+        for val in data.values()
     }
 
-def plot_price_range(current, min_price, max_price, avg_price):
-    fig, ax = plt.subplots(figsize=(6, 1.2))
+@lru_cache()
+def get_company_sic(cik):
+    """
+    Given a zero‑padded 10‑digit CIK, pull its SIC from the submissions JSON.
+    """
+    url = f"https://data.sec.gov/submissions/CIK{cik}.json"
+    r = requests.get(url, headers=HEADERS)
+    r.raise_for_status()
+    info = r.json()
+    return info.get("sic")
 
-    # Draw range
-    ax.plot([min_price, max_price], [0, 0], color="gray", linewidth=10, alpha=0.3)
+def get_peers(ticker, peer_count=8):
+    """
+    Dynamic peer lookup via SEC SIC.
+    Returns (peers, sector, industry)
+    """
+    ticker = ticker.upper()
+    mapping = load_ticker_cik_map()
+    cik = mapping.get(ticker)
+    if not cik:
+        st.warning(f"Ticker {ticker} not found in SEC mapping.")
+        return [], "", ""
 
-    # Average line
-    ax.plot([avg_price, avg_price], [-0.1, 0.1], color="blue", linewidth=2)
+    # 1) get SIC
+    sic = get_company_sic(cik)
+    if not sic:
+        st.warning(f"SIC code not found for {ticker}.")
+        return [], "", ""
 
-    # Current price marker
-    ax.plot(current, 0, marker='o', color="red", markersize=10)
+    # 2) pull EDGAR browse page for that SIC
+    browse_url = (
+        f"https://www.sec.gov/cgi-bin/browse-edgar"
+        f"?action=getcompany&SIC={sic}&owner=exclude&count={peer_count}&output=xml"
+    )
+    r2 = requests.get(browse_url, headers=HEADERS)
+    r2.raise_for_status()
+    soup = BeautifulSoup(r2.text, "lxml")
 
-    # Range labels
-    ax.text(avg_price, 0.18, f"Avg: ${avg_price:.2f}", ha='center', fontsize=8)
-    ax.text(current, -0.18, f"Current: ${current:.2f}", ha='center', fontsize=8, color='red')
-    ax.text(min_price, 0.12, f"Low: ${min_price:.2f}", ha='left', fontsize=8)
-    ax.text(max_price, 0.12, f"High: ${max_price:.2f}", ha='right', fontsize=8)
+    # 3) extract CIKs of peers
+    peer_ciks = []
+    for div in soup.select("div.companyInfo"):
+        span = div.find("span", class_="companyCik")
+        if not span:
+            continue
+        peer_cik = span.text.strip().split(" ")[0]  # e.g. '0000320193'
+        if peer_cik != cik:
+            peer_ciks.append(peer_cik)
 
-    ax.set_xlim(min_price * 0.95, max_price * 1.05)
-    ax.axis('off')
-    st.pyplot(fig)
+    # 4) map CIKs back to tickers
+    reverse_map = {v: k for k, v in mapping.items()}
+    peers = [reverse_map.get(pc) for pc in peer_ciks]
+    peers = [p for p in peers if p]  # drop any unmapped
+
+    # Optionally, you can also grab sector/industry from yfinance:
+    info = {}
+    try:
+        info = requests.get(
+            f"https://data.sec.gov/submissions/CIK{cik}.json",
+            headers=HEADERS
+        ).json().get("sicDescription", {})
+    except:
+        pass
+
+    # For sector/industry, fall back to yfinance if you wish:
+    # import yfinance as yf
+    # yfinfo = yf.Ticker(ticker).info
+    # sector = yfinfo.get("sector", "")
+    # industry = yfinfo.get("industry", "")
+    sector, industry = "", ""
+
+    return peers[:peer_count], sector, industry
