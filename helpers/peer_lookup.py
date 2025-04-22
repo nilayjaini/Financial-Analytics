@@ -1,84 +1,100 @@
+# helpers/peer_lookup.py
 import requests
-from bs4 import BeautifulSoup
 import streamlit as st
+from bs4 import BeautifulSoup
+from functools import lru_cache
 
-USER_AGENT = "YourName your.email@example.com"
+# SEC requires a descriptive User-Agent
+HEADERS = {
+    "User-Agent": "Your Name your_email@example.com",
+    "Accept-Encoding": "gzip, deflate",
+    "Host": "www.sec.gov",
+}
 
-@st.cache_data(show_spinner=False)
-def load_ticker_to_cik() -> dict[str, str]:
+@lru_cache()
+def load_ticker_cik_map():
     """
-    Download and parse SEC’s ticker→CIK mapping.
-    Skips any malformed lines.
+    Loads the SEC's master ticker -> CIK mapping.
+    Returns { 'AAPL': '0000320193', ... }
     """
-    url = "https://www.sec.gov/include/ticker.txt"
-    r = requests.get(url, headers={"User-Agent": USER_AGENT})
+    url = "https://www.sec.gov/files/company_tickers.json"
+    r = requests.get(url, headers=HEADERS)
     r.raise_for_status()
-
-    mapping = {}
-    for line in r.text.splitlines():
-        if "|" not in line:
-            continue
-        ticker, cik = line.split("|", 1)
-        ticker = ticker.strip().upper()
-        cik = cik.strip()
-        if ticker and cik:
-            mapping[ticker] = cik
-
-    return mapping
-
-@st.cache_data(show_spinner=False)
-def get_sic_from_cik(cik: str) -> str:
-    """
-    Scrape a company’s SEC page to extract its 4‑digit SIC code.
-    """
-    url = (
-        "https://www.sec.gov/cgi-bin/browse-edgar"
-        f"?CIK={cik}&action=getcompany&owner=exclude"
-    )
-    r = requests.get(url, headers={"User-Agent": USER_AGENT})
-    r.raise_for_status()
-
-    soup = BeautifulSoup(r.text, "html.parser")
-    th = soup.find("th", string="SIC")
-    if not th:
-        return ""
-    td = th.find_next_sibling("td")
-    return td.get_text(strip=True) if td else ""
-
-@st.cache_data(show_spinner=False)
-def get_peer_tickers_by_sic(sic: str, ticker_map: dict[str, str]) -> list[str]:
-    """
-    Given an SIC, fetch all peer CIKs from EDGAR and map back to tickers.
-    """
-    url = (
-        "https://www.sec.gov/cgi-bin/browse-edgar"
-        f"?action=getcompany&SIC={sic}&owner=exclude&count=200"
-    )
-    r = requests.get(url, headers={"User-Agent": USER_AGENT})
-    r.raise_for_status()
-
-    soup = BeautifulSoup(r.text, "html.parser")
-    peer_ciks = {
-        a["href"].split("CIK=")[1].split("&")[0]
-        for a in soup.select("table.tableFile2 a[href*='CIK=']")
+    data = r.json()
+    # the JSON is keyed by integer strings, with values { ticker, cik_str, ... }
+    return {
+        val["ticker"].upper(): val["cik_str"].zfill(10)
+        for val in data.values()
     }
 
-    # invert the ticker→CIK map
-    cik_to_ticker = {c: t for t, c in ticker_map.items()}
-    return [cik_to_ticker[c] for c in peer_ciks if c in cik_to_ticker]
+@lru_cache()
+def get_company_sic(cik):
+    """
+    Given a zero‑padded 10‑digit CIK, pull its SIC from the submissions JSON.
+    """
+    url = f"https://data.sec.gov/submissions/CIK{cik}.json"
+    r = requests.get(url, headers=HEADERS)
+    r.raise_for_status()
+    info = r.json()
+    return info.get("sic")
 
-def get_dynamic_peers(ticker: str) -> list[str]:
+def get_peers(ticker, peer_count=8):
     """
-    Top‑level helper: ticker → CIK → SIC → [peer tickers].
+    Dynamic peer lookup via SEC SIC.
+    Returns (peers, sector, industry)
     """
-    ticker = ticker.upper().strip()
-    ticker_map = load_ticker_to_cik()
-    cik = ticker_map.get(ticker)
+    ticker = ticker.upper()
+    mapping = load_ticker_cik_map()
+    cik = mapping.get(ticker)
     if not cik:
-        return []
-    sic = get_sic_from_cik(cik)
+        st.warning(f"Ticker {ticker} not found in SEC mapping.")
+        return [], "", ""
+
+    # 1) get SIC
+    sic = get_company_sic(cik)
     if not sic:
-        return []
-    peers = get_peer_tickers_by_sic(sic, ticker_map)
-    # remove self if it sneaks in
-    return [p for p in peers if p != ticker]
+        st.warning(f"SIC code not found for {ticker}.")
+        return [], "", ""
+
+    # 2) pull EDGAR browse page for that SIC
+    browse_url = (
+        f"https://www.sec.gov/cgi-bin/browse-edgar"
+        f"?action=getcompany&SIC={sic}&owner=exclude&count={peer_count}&output=xml"
+    )
+    r2 = requests.get(browse_url, headers=HEADERS)
+    r2.raise_for_status()
+    soup = BeautifulSoup(r2.text, "lxml")
+
+    # 3) extract CIKs of peers
+    peer_ciks = []
+    for div in soup.select("div.companyInfo"):
+        span = div.find("span", class_="companyCik")
+        if not span:
+            continue
+        peer_cik = span.text.strip().split(" ")[0]  # e.g. '0000320193'
+        if peer_cik != cik:
+            peer_ciks.append(peer_cik)
+
+    # 4) map CIKs back to tickers
+    reverse_map = {v: k for k, v in mapping.items()}
+    peers = [reverse_map.get(pc) for pc in peer_ciks]
+    peers = [p for p in peers if p]  # drop any unmapped
+
+    # Optionally, you can also grab sector/industry from yfinance:
+    info = {}
+    try:
+        info = requests.get(
+            f"https://data.sec.gov/submissions/CIK{cik}.json",
+            headers=HEADERS
+        ).json().get("sicDescription", {})
+    except:
+        pass
+
+    # For sector/industry, fall back to yfinance if you wish:
+    # import yfinance as yf
+    # yfinfo = yf.Ticker(ticker).info
+    # sector = yfinfo.get("sector", "")
+    # industry = yfinfo.get("industry", "")
+    sector, industry = "", ""
+
+    return peers[:peer_count], sector, industry
