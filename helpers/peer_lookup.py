@@ -1,66 +1,47 @@
-# helpers/peer_lookup.py
-import os
 import requests
-import yfinance as yf
+from bs4 import BeautifulSoup
+import streamlit as st
 
-#––– CONFIGURE YOUR TOKEN –––#
-# Set this in your shell or Streamlit Cloud secrets:
-#   export FINNHUB_TOKEN="d03tvi9r01qm4vp426jgd03tvi9r01qm4vp426k0"
-FINNHUB_TOKEN = os.getenv("FINNHUB_TOKEN")
+@st.cache_data(show_spinner=False)
+def load_ticker_to_cik():
+    """Download and parse SEC’s ticker→CIK map once."""
+    url = "https://www.sec.gov/include/ticker.txt"
+    txt = requests.get(url, headers={"User-Agent":"youremail@example.com"}).text
+    return {t.upper(): c for t, c in (line.split("|") for line in txt.splitlines())}
 
-def get_peers(ticker_symbol: str):
-    """
-    Returns (peers_list, sector, industry)
-    1) Try Finnhub peers endpoint
-    2) Fallback to yfinance same‐industry scan over a small universe
-    """
-    peers = []
+@st.cache_data(show_spinner=False)
+def get_sic_from_cik(cik: str) -> str:
+    """Fetch a company’s SIC code from its SEC company page."""
+    url = f"https://www.sec.gov/cgi-bin/browse-edgar?CIK={cik}&action=getcompany&owner=exclude"
+    r = requests.get(url, headers={"User-Agent":"youremail@example.com"})
+    soup = BeautifulSoup(r.text, "html.parser")
+    # find the row where <th>SIC</th> and grab the next <td>
+    row = soup.find("th", string="SIC")
+    return row.find_next_sibling("td").get_text(strip=True)
 
-    # 1) Finnhub.io peers
-    if FINNHUB_TOKEN:
-        try:
-            url = (
-                f"https://finnhub.io/api/v1/stock/peers"
-                f"?symbol={ticker_symbol}&token={FINNHUB_TOKEN}"
-            )
-            resp = requests.get(url, timeout=5)
-            resp.raise_for_status()
-            data = resp.json()          # should be a list of tickers
-            if isinstance(data, list) and data:
-                peers = data
-        except Exception:
-            peers = []
+@st.cache_data(show_spinner=False)
+def get_peer_tickers_by_sic(sic: str, ticker_map: dict) -> list[str]:
+    """Get all company CIKs for a given SIC, map back to tickers."""
+    url = f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&SIC={sic}&owner=exclude&count=200"
+    r = requests.get(url, headers={"User-Agent":"youremail@example.com"})
+    soup = BeautifulSoup(r.text, "html.parser")
+    peers = set()
+    # each row link to “?CIK=0000…”
+    for a in soup.select("table.tableFile2 a"):
+        href = a.get("href","")
+        if "CIK=" in href:
+            cik = href.split("CIK=")[1].split("&")[0]
+            peers.add(cik)
+    # invert ticker_map to CIK→ticker
+    cik_to_ticker = {c: t for t, c in ticker_map.items()}
+    # translate and filter
+    return [cik_to_ticker[c] for c in peers if c in cik_to_ticker]
 
-    # 2) Fallback: same‐sector / industry via yfinance
-    if not peers:
-        try:
-            info = yf.Ticker(ticker_symbol).info
-            sector  = info.get("sector", "")
-            industry = info.get("industry", "")
-        except Exception:
-            sector, industry = "", ""
-        else:
-            # For demo we use a small universe; in prod swap in your S&P 500 list
-            universe = ["AAPL","MSFT","GOOGL","AMZN","TSLA","NFLX","META",
-                        "IBM","ORCL","INTC","CSCO","DELL","HPQ","WMT","TGT"]
-            matches = []
-            for t in universe:
-                if t == ticker_symbol:
-                    continue
-                try:
-                    inf = yf.Ticker(t).info
-                    if inf.get("sector")==sector and inf.get("industry")==industry:
-                        matches.append(t)
-                except Exception:
-                    pass
-            peers = matches
-
-    # finally, grab sector/industry for display
-    try:
-        info = yf.Ticker(ticker_symbol).info
-        sector  = info.get("sector", "")
-        industry = info.get("industry", "")
-    except Exception:
-        sector, industry = "", ""
-
-    return peers, sector, industry
+def get_dynamic_peers(ticker: str) -> list[str]:
+    """High-level: ticker → dynamic list of peer tickers via SEC SIC."""
+    ticker_map = load_ticker_to_cik()
+    cik = ticker_map.get(ticker.upper())
+    if not cik:
+        return []
+    sic = get_sic_from_cik(cik)
+    return get_peer_tickers_by_sic(sic, ticker_map)
