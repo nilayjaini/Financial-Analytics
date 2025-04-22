@@ -1,4 +1,5 @@
 import streamlit as st
+import yfinance as yf
 from helpers.peer_lookup import get_dynamic_peers
 from helpers.valuation_logic import analyze_valuation, plot_price_range
 
@@ -8,14 +9,12 @@ st.title("💸 Valuation Advisor")
 ticker_input = st.text_input("Enter a ticker symbol", "DELL")
 
 if ticker_input:
-    
+    # dynamically fetch peers
     peers = get_dynamic_peers(ticker_input)
-    st.markdown(f"**Sector:** {sector}  ")
-    st.markdown(f"**Industry:** {industry}  ")
-    st.markdown(f"**Peers:** {', '.join(peers) if peers else 'N/A'}")
+    st.markdown(f"**Peers (by SIC):** {', '.join(peers) if peers else 'N/A'}")
 
     if not peers:
-        st.warning("⚠️ Could not fetch peer data.")
+        st.warning("⚠️ Could not fetch dynamic peer list via SIC.")
     else:
         result = analyze_valuation(ticker_input.upper(), peers)
 
