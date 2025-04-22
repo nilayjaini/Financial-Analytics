@@ -8,7 +8,7 @@ st.title("💸 Valuation Advisor")
 ticker_input = st.text_input("Enter a ticker symbol", "DELL")
 
 if ticker_input:
-    #peers, sector, industry = get_peers(ticker_input.upper())
+    
     peers = get_dynamic_peers(ticker_input)
     st.markdown(f"**Sector:** {sector}  ")
     st.markdown(f"**Industry:** {industry}  ")
