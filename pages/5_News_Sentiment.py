@@ -1,78 +1,64 @@
-# ─── at the top of your file ──────────────────────────────────────────────────
+# At the top of your main app (e.g. 1_Company_Snapshot.py or your __init__.py)
 import streamlit as st
+from textblob import TextBlob
 import yfinance as yf
-from transformers import pipeline
 
-# load once (this can take ~10–20s on first run)
-@st.cache_resource
-def load_finbert():
-    return pipeline(
-        "sentiment-analysis",
-        model="yiyanghkust/finbert-tone",
-        tokenizer="yiyanghkust/finbert-tone",
-        return_all_scores=False
-    )
+# (Paste your existing get_recent_news_sentiment here)
 
-finbert = load_finbert()
-
-
-# ─── replace your existing get_recent_news_sentiment ────────────────────────
 def get_recent_news_sentiment(ticker):
-    news_items = yf.Ticker(ticker).news[:5]
-    results = []
-    for article in news_items:
-        title = article.get("title", "").strip()
-        if not title:
-            continue
+    news = yf.Ticker(ticker).news
+    sentiments = []
+    for article in news[:5]:
+        title = article.get("title", "")
+        sentiment = TextBlob(title).sentiment.polarity
+        sentiments.append((title, sentiment))
+    return sentiments
 
-        # FinBERT returns a dict like {'label': 'POSITIVE', 'score': 0.99}
-        pred = finbert(title)[0]
-        label = pred["label"]       # POSITIVE / NEUTRAL / NEGATIVE
-        score = pred["score"]       # float in [0,1]
+# === Page selector ===
+st.set_page_config(layout="wide")
+page = st.sidebar.selectbox("🔎 Choose a page", [
+    "🏢 Company Snapshot",
+    "💸 Valuation Advisor",
+    "📂 Financial Fundamentals",
+    "🧠 Risk-Matched Stocks",
+    "📰 News & Sentiment"   # ← new option
+])
 
-        # map to a polarity-like scale if you want:
-        #   POSITIVE  -> +score
-        #   NEUTRAL   ->  0
-        #   NEGATIVE  -> −score
-        polarity = {
-            "POSITIVE": +score,
-            "NEUTRAL":  0.0,
-            "NEGATIVE": -score
-        }[label]
+# === Existing pages ===
+if page == "🏢 Company Snapshot":
+    # ... your existing code ...
+    pass
 
-        results.append({
-            "title":     title,
-            "label":     label,
-            "score":     score,
-            "polarity":  polarity
-        })
-    return results
+elif page == "💸 Valuation Advisor":
+    # ... your existing code ...
+    pass
 
+# (other elifs)
 
-# ─── in your “News & Sentiment” page ─────────────────────────────────────────
+# === New News & Sentiment page ===
 elif page == "📰 News & Sentiment":
-    st.title("📰 Real-Time News Sentiment (FinBERT)")
+    st.title("📰 Real-Time News Sentiment")
     ticker_input = st.text_input("Enter ticker symbol", "AAPL").upper()
-    if ticker_input:
-        try:
-            items = get_recent_news_sentiment(ticker_input)
-            if not items:
-                st.warning("No recent headlines found.")
-            else:
-                # Display each with color coding
-                for it in items:
-                    color = "green" if it["polarity"]>0 \
-                            else "red"   if it["polarity"]<0 \
-                            else "gray"
-                    st.markdown(
-                        f"- **{it['label']}** ({it['score']:.2f}) "
-                        f"<span style='color:{color}'>●</span>  {it['title']}",
-                        unsafe_allow_html=True
-                    )
-                # Chart the polarity scores
-                st.bar_chart([it["polarity"] for it in items])
-        except Exception as e:
-            st.error("Error fetching or processing news.")
-            st.exception(e)
+    
+    # Auto-refresh every 60 seconds (optional)
+    st.experimental_rerun()  # or use st_autorefresh from streamlit_autorefresh
 
-    st.caption("Sentiment via FinBERT (`yiyanghkust/finbert-tone`)")
+    if ticker_input:
+        st.markdown(f"### Latest headlines for **{ticker_input}**")
+        try:
+            data = get_recent_news_sentiment(ticker_input)
+            if not data:
+                st.warning("No recent news found.")
+            else:
+                # Display headlines + polarity
+                for title, score in data:
+                    color = "green" if score>0 else "red" if score<0 else "gray"
+                    st.markdown(f"- **{score:+.2f}** <span style='color:{color}'>●</span>  {title}", unsafe_allow_html=True)
+                
+                # Quick bar chart of sentiment scores
+                scores = [s for (_,s) in data]
+                st.bar_chart(scores)
+        except Exception as e:
+            st.error("Failed to fetch news. Try again later.")
+
+    st.caption("Data via Yahoo Finance + TextBlob sentiment")
