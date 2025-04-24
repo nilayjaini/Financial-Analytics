@@ -1,64 +1,50 @@
-# At the top of your main app (e.g. 1_Company_Snapshot.py or your __init__.py)
 import streamlit as st
-from textblob import TextBlob
 import yfinance as yf
+from textblob import TextBlob
+from streamlit_autorefresh import st_autorefresh
 
-# (Paste your existing get_recent_news_sentiment here)
+st.set_page_config(
+    page_title="News & Sentiment", 
+    layout="wide"
+)
 
-def get_recent_news_sentiment(ticker):
-    news = yf.Ticker(ticker).news
-    sentiments = []
-    for article in news[:5]:
-        title = article.get("title", "")
-        sentiment = TextBlob(title).sentiment.polarity
-        sentiments.append((title, sentiment))
-    return sentiments
+# ─── Helper ───────────────────────────────────────────────────────────────────
+def get_recent_news_sentiment(ticker: str):
+    news_items = yf.Ticker(ticker).news[:5]
+    results = []
+    for article in news_items:
+        title = article.get("title", "").strip()
+        if not title:
+            continue
+        polarity = TextBlob(title).sentiment.polarity
+        results.append((title, polarity))
+    return results
 
-# === Page selector ===
-st.set_page_config(layout="wide")
-page = st.sidebar.selectbox("🔎 Choose a page", [
-    "🏢 Company Snapshot",
-    "💸 Valuation Advisor",
-    "📂 Financial Fundamentals",
-    "🧠 Risk-Matched Stocks",
-    "📰 News & Sentiment"   # ← new option
-])
+# ─── Auto-refresh every 60s ───────────────────────────────────────────────────
+st_autorefresh(interval=60_000, key="news_refresh")
 
-# === Existing pages ===
-if page == "🏢 Company Snapshot":
-    # ... your existing code ...
-    pass
+# ─── Page ─────────────────────────────────────────────────────────────────────
+st.title("📰 Real-Time News Sentiment")
+ticker = st.text_input("Enter ticker symbol", "AAPL").upper()
 
-elif page == "💸 Valuation Advisor":
-    # ... your existing code ...
-    pass
+if ticker:
+    st.markdown(f"### Latest headlines for **{ticker}**")
+    try:
+        data = get_recent_news_sentiment(ticker)
+        if not data:
+            st.warning("No recent news found.")
+        else:
+            for title, score in data:
+                color = "green" if score > 0 else "red" if score < 0 else "gray"
+                st.markdown(
+                    f"- **{score:+.2f}** <span style='color:{color}'>●</span>  {title}",
+                    unsafe_allow_html=True
+                )
 
-# (other elifs)
+            # Bar chart of the last 5 polarity scores
+            st.subheader("Sentiment Scores")
+            st.bar_chart([s for (_, s) in data])
+    except Exception:
+        st.error("Failed to fetch or analyze news. Try again later.")
 
-# === New News & Sentiment page ===
-elif page == "📰 News & Sentiment":
-    st.title("📰 Real-Time News Sentiment")
-    ticker_input = st.text_input("Enter ticker symbol", "AAPL").upper()
-    
-    # Auto-refresh every 60 seconds (optional)
-    st.experimental_rerun()  # or use st_autorefresh from streamlit_autorefresh
-
-    if ticker_input:
-        st.markdown(f"### Latest headlines for **{ticker_input}**")
-        try:
-            data = get_recent_news_sentiment(ticker_input)
-            if not data:
-                st.warning("No recent news found.")
-            else:
-                # Display headlines + polarity
-                for title, score in data:
-                    color = "green" if score>0 else "red" if score<0 else "gray"
-                    st.markdown(f"- **{score:+.2f}** <span style='color:{color}'>●</span>  {title}", unsafe_allow_html=True)
-                
-                # Quick bar chart of sentiment scores
-                scores = [s for (_,s) in data]
-                st.bar_chart(scores)
-        except Exception as e:
-            st.error("Failed to fetch news. Try again later.")
-
-    st.caption("Data via Yahoo Finance + TextBlob sentiment")
+st.caption("Data via Yahoo Finance + TextBlob sentiment")
