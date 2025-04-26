@@ -1,120 +1,134 @@
+# pages/4_Backtest_Industry_PE.py
 import streamlit as st
 import pandas as pd
-import numpy as np
-from datetime import datetime, date
-from pandas import Timestamp
+import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
 st.title("🧮 Industry P/E × EPS Backtest")
 
-def flatten_wide(df: pd.DataFrame) -> pd.DataFrame:
-    if isinstance(df.columns, pd.MultiIndex):
-        new_cols = []
-        for lvl0, lvl1 in df.columns:
-            if pd.isna(lvl1):
-                new_cols.append(lvl0)
-            else:
-                if isinstance(lvl1, (Timestamp, datetime, date)):
-                    new_cols.append(lvl1.strftime("%Y-%m-%d"))
-                else:
-                    new_cols.append(str(lvl1))
-        df.columns = new_cols
-    return df
-
+# 1) Load & cache your Excel sheets
 @st.cache_data
 def load_data():
-    # 1) GICS mapping
-    gics = pd.read_csv("data/GICS code.csv", parse_dates=["datadate"])
-
-    # 2) Read & flatten
     xls = pd.ExcelFile("data/Master_data_EPS_Price_PE.xlsx")
-    df_eps_wide   = flatten_wide(xls.parse("EPS"))
-    df_price_wide = flatten_wide(xls.parse("Price"))
-    df_pe_wide    = flatten_wide(xls.parse("PE"))
+    df_eps = xls.parse("EPS")
+    df_pe  = xls.parse("PE")
+    df_price = xls.parse("Price")
+    return df_eps, df_pe, df_price
 
-    # 3) Identify true date cols
-    def is_date_str(c):
-        dt = pd.to_datetime(c, format="%Y-%m-%d", errors="coerce")
-        return not pd.isna(dt)
+# 2) Helper to unpivot a wide → long
+def melt_yearly(df_wide, value_name):
+    # identify the date‐columns (pandas Timestamps)
+    date_cols = [c for c in df_wide.columns if isinstance(c, pd.Timestamp)]
+    id_vars   = [c for c in df_wide.columns if c not in date_cols]
+    df_long = df_wide.melt(
+        id_vars=id_vars,
+        value_vars=date_cols,
+        var_name="datadate",
+        value_name=value_name,
+    )
+    df_long["year"] = df_long["datadate"].dt.year
+    return df_long
 
-    date_cols = [c for c in df_eps_wide.columns if is_date_str(c)]
-    id_cols   = [c for c in df_eps_wide.columns if c not in date_cols]
+# load once
+df_eps_w, df_pe_w, df_price_w = load_data()
 
-    # 4) Melt only date_cols
-    df_eps   = df_eps_wide.melt(id_vars=id_cols, value_vars=date_cols,
-                                var_name="datadate", value_name="EPS")
-    df_price = df_price_wide.melt(id_vars=id_cols, value_vars=date_cols,
-                                  var_name="datadate", value_name="ActualPrice")
-    df_pe    = df_pe_wide.melt(id_vars=id_cols, value_vars=date_cols,
-                               var_name="datadate", value_name="PE")
+# unpivot all three
+df_eps   = melt_yearly(df_eps_w,   "EPS")
+df_pe    = melt_yearly(df_pe_w,    "PE")
+df_price = melt_yearly(df_price_w, "Price")
 
-    # 5) Cast datadate
-    for ddf in (df_eps, df_price, df_pe):
-        ddf["datadate"] = pd.to_datetime(ddf["datadate"], format="%Y-%m-%d")
+# 3) User inputs
+ticker   = st.text_input("Ticker for backtest", "MSFT").upper()
+horizon  = st.selectbox("Forecast horizon (years)", [1,2,3,5], index=0)
 
-    # 6) Merge
-    df = (
-      df_eps
-      .merge(df_price[["Ticker","datadate","ActualPrice"]],
-             on=["Ticker","datadate"])
-      .merge(df_pe[["Ticker","datadate","PE"]],
-             on=["Ticker","datadate"])
+if ticker:
+    # find the industry subgroup for this ticker
+    ticker_row = df_eps_w[df_eps_w["Ticker"] == ticker]
+    if ticker_row.empty:
+        st.error(f"❌ No EPS data found for {ticker}")
+        st.stop()
+
+    gsubind = ticker_row["gsubind"].iloc[0]
+    st.write(f"**Industry Sub‐Group Code:** {gsubind}")
+
+    # 4) median PE by year within that industry
+    df_pe_ind = (
+        df_pe[df_pe["gsubind"] == gsubind]
+        .groupby("year")["PE"]
+        .median()
+        .reset_index(name="Median_PE")
     )
 
-    # 7) Join GICS info
-    df = df.merge(
-      gics.rename(columns={"tic":"Ticker"})[["Ticker","datadate","gsubind","fyear"]],
-      on=["Ticker","datadate"], how="left"
+    # EPS & Price time‐series for our ticker
+    df_eps_t   = df_eps[df_eps["Ticker"] == ticker][["year","EPS"]]
+    df_price_t = df_price[df_price["Ticker"] == ticker][["year","Price"]]
+
+    # 5) assemble backtest hits
+    records = []
+    for _, row in df_eps_t.iterrows():
+        base_year = int(row["year"])
+        eps_val   = row["EPS"]
+        target_year = base_year + horizon
+
+        # get that year's median PE
+        pe_row = df_pe_ind[df_pe_ind["year"] == base_year]
+        if pe_row.empty:
+            continue
+        pe_med = pe_row["Median_PE"].iloc[0]
+
+        # predicted vs actual
+        pred_price = eps_val * pe_med
+        actual_row = df_price_t[df_price_t["year"] == target_year]
+        if actual_row.empty:
+            continue
+        actual_price = actual_row["Price"].iloc[0]
+
+        err_pct = (pred_price - actual_price) / actual_price * 100
+        hit     = abs(err_pct) <= 10  # ±10% tolerance
+
+        records.append({
+            "Base Year":       base_year,
+            "Target Year":     target_year,
+            "EPS":              eps_val,
+            "Median P/E":       pe_med,
+            "Predicted Price":  pred_price,
+            "Actual Price":     actual_price,
+            "Error (%)":       err_pct,
+            "Hit (±10%)":      "✔️" if hit else "❌",
+        })
+
+    df_bt = pd.DataFrame(records)
+    if df_bt.empty:
+        st.warning("ℹ️ Not enough data to run a backtest for that horizon.")
+        st.stop()
+
+    # 6) Hit rate metric
+    hit_rate = (df_bt["Hit (±10%)"] == "✔️").mean() * 100
+    st.metric("Hit Rate (±10% error)", f"{hit_rate:.1f}%")
+
+    # 7) Plot Actual vs Predicted
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df_bt["Base Year"], y=df_bt["Actual Price"],
+        mode="lines+markers", name="Actual"
+    ))
+    fig.add_trace(go.Scatter(
+        x=df_bt["Base Year"], y=df_bt["Predicted Price"],
+        mode="lines+markers", name="Predicted"
+    ))
+    fig.update_layout(
+        title=f"{ticker}: {horizon}-Year Backtest",
+        xaxis_title="Base Year",
+        yaxis_title="Price ($)",
+        height=400
     )
+    st.plotly_chart(fig, use_container_width=True)
 
-    # 8) Prep
-    df["year"] = df["fyear"]
-    df.rename(columns={"Ticker":"tic"}, inplace=True)
-    return df
-
-# Load once
-df = load_data()
-
-# ---- UI ----
-stock   = st.text_input("Ticker for backtest", "MSFT").upper()
-horizon = st.selectbox("Forecast horizon (years)", [1, 2], index=0)
-
-if stock and stock in df["tic"].unique():
-    # Compute median P/E by industry-year
-    med_pe = (
-       df.groupby(["gsubind","year"])["PE"]
-         .median()
-         .reset_index()
-         .rename(columns={"PE":"MedianPE"})
-    )
-
-    # This stock’s EPS series
-    stock_eps = df[df["tic"]==stock][["year","EPS","gsubind"]]
-    bt = stock_eps.merge(med_pe, on=["gsubind","year"], how="left")
-
-    # Predict & pull actual next‐year price
-    bt["Predicted"] = bt["MedianPE"] * bt["EPS"]
-    price_map      = df.set_index(["tic","year"])["ActualPrice"]
-    bt["Actual"]   = bt.apply(
-        lambda r: price_map.get((stock, r.year + horizon), np.nan),
-        axis=1
-    )
-
-    # Error + hit
-    bt["PctError"] = (bt["Actual"] - bt["Predicted"]) / bt["Predicted"] * 100
-    bt["Hit"]      = bt["PctError"].abs() < 10
-
-    # Display table & summary
-    st.subheader(f"🔍 Backtest: {stock} over {horizon}-yr horizon")
-    st.dataframe(
-      bt[["year","EPS","MedianPE","Predicted","Actual","PctError","Hit"]],
-      use_container_width=True
-    )
-    st.markdown(f"""
-      **Mean Abs % Error:** {bt["PctError"].abs().mean():.1f}%  
-      **Hit Rate (|error|<10%):** {bt["Hit"].mean()*100:.1f}%  
-    """)
-    st.line_chart(bt.set_index("year")[["Actual","Predicted"]], height=300)
-
-elif stock:
-    st.error(f"No data for ticker '{stock}' in your backtest universe.")
+    # 8) Show detail table
+    st.dataframe(df_bt.style.format({
+        "EPS":              "{:.2f}",
+        "Median P/E":       "{:.2f}",
+        "Predicted Price":  "${:,.2f}",
+        "Actual Price":     "${:,.2f}",
+        "Error (%)":        "{:+.1f}%",
+    }))
