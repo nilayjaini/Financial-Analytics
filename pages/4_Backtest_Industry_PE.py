@@ -17,47 +17,34 @@ def load_data():
 
 # 2) Helper to unpivot a wide → long
 def melt_yearly(df_wide, value_name):
-    # identify the date‐columns (pandas Timestamps)
+    # 1) Try to convert any column name that *looks* like a date into a Timestamp
+    rename_map = {}
+    for col in df_wide.columns:
+        try:
+            # if this succeeds, col really is a date
+            dt = pd.to_datetime(col, infer_datetime_format=True)
+            rename_map[col] = dt
+        except (ValueError, TypeError):
+            # cannot parse → leave as is
+            pass
+
+    df_wide = df_wide.rename(columns=rename_map)
+
+    # 2) Now identify which columns *are* real Timestamps
     date_cols = [c for c in df_wide.columns if isinstance(c, pd.Timestamp)]
     id_vars   = [c for c in df_wide.columns if c not in date_cols]
+
+    # 3) Melt into long form
     df_long = df_wide.melt(
-        id_vars=id_vars,
-        value_vars=date_cols,
-        var_name="datadate",
-        value_name=value_name,
+        id_vars     = id_vars,
+        value_vars  = date_cols,
+        var_name    = "datadate",
+        value_name  = value_name
     )
+
+    # 4) Safely extract year
     df_long["year"] = df_long["datadate"].dt.year
     return df_long
-
-# load once
-df_eps_w, df_pe_w, df_price_w = load_data()
-
-# unpivot all three
-df_eps   = melt_yearly(df_eps_w,   "EPS")
-df_pe    = melt_yearly(df_pe_w,    "PE")
-df_price = melt_yearly(df_price_w, "Price")
-
-# 3) User inputs
-ticker   = st.text_input("Ticker for backtest", "MSFT").upper()
-horizon  = st.selectbox("Forecast horizon (years)", [1,2,3,5], index=0)
-
-if ticker:
-    # find the industry subgroup for this ticker
-    ticker_row = df_eps_w[df_eps_w["Ticker"] == ticker]
-    if ticker_row.empty:
-        st.error(f"❌ No EPS data found for {ticker}")
-        st.stop()
-
-    gsubind = ticker_row["gsubind"].iloc[0]
-    st.write(f"**Industry Sub‐Group Code:** {gsubind}")
-
-    # 4) median PE by year within that industry
-    df_pe_ind = (
-        df_pe[df_pe["gsubind"] == gsubind]
-        .groupby("year")["PE"]
-        .median()
-        .reset_index(name="Median_PE")
-    )
 
     # EPS & Price time‐series for our ticker
     df_eps_t   = df_eps[df_eps["Ticker"] == ticker][["year","EPS"]]
