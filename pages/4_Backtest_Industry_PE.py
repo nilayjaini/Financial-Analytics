@@ -64,25 +64,29 @@ for year in range(2015, 2024):
         'Hit': hit
     })
 
-# Convert to DataFrame
-results_df = pd.DataFrame(results)
+# Convert to DataFrame with explicit columns to preserve schema even if empty
+columns = ['Year', 'EPS', 'Median P/E', 'Predicted', 'Actual', 'Hit']
+results_df = pd.DataFrame(results, columns=columns)
 
 # Display results table
 st.header(f"Backtest for {ticker} (Sub-industry: {gsubind})")
 st.dataframe(results_df)
 
-# Scatter plot Predicted vs Actual
-st.subheader("Predicted vs. Actual Prices")
-fig, ax = plt.subplots()
-ax.scatter(results_df['Predicted'], results_df['Actual'], alpha=0.7)
-# 45-degree reference line
-data_min = min(results_df['Predicted'].min(), results_df['Actual'].min())
-data_max = max(results_df['Predicted'].max(), results_df['Actual'].max())
-ax.plot([data_min, data_max], [data_min, data_max], linestyle='--')
-ax.set_xlabel('Predicted Price')
-ax.set_ylabel('Actual Price')
-st.pyplot(fig)
+if results_df.empty:
+    st.warning("No backtest results to display. Try a different ticker or horizon.")
+else:
+    # Scatter plot Predicted vs Actual
+    st.subheader("Predicted vs. Actual Prices")
+    fig, ax = plt.subplots()
+    ax.scatter(results_df['Predicted'], results_df['Actual'], alpha=0.7)
+    # 45-degree reference line
+    data_min = min(results_df['Predicted'].min(), results_df['Actual'].min())
+    data_max = max(results_df['Predicted'].max(), results_df['Actual'].max())
+    ax.plot([data_min, data_max], [data_min, data_max], linestyle='--')
+    ax.set_xlabel('Predicted Price')
+    ax.set_ylabel('Actual Price')
+    st.pyplot(fig)
 
-# Overall hit-rate
-hit_rate = results_df['Hit'].mean() * 100 if not results_df.empty else 0
-st.metric(label="Hit Rate", value=f"{hit_rate:.1f}%")
+    # Overall hit-rate
+    hit_rate = results_df['Hit'].mean() * 100
+    st.metric(label="Hit Rate", value=f"{hit_rate:.1f}%")
