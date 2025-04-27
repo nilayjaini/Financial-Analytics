@@ -1,35 +1,33 @@
-import pandas as pd
 
-def load_compustat_data(data_path: str = "data") -> pd.DataFrame:
-def load_compustat_data(data_path="data") -> pd.DataFrame:
-"""
-   Reads and merges the four Compustat CSVs on
-   (fyear, tic, conm, cik, gsubind, sic) and returns
-   a single DataFrame with columns:
-     fyear, tic, conm, cik, gsubind, sic,
-     eps, P/E, 2024_mkt_cap, Price
-   """
-    # 1) Read each CSV
-    df_eps   = pd.read_csv(f"{data_path}/Compustat_eps.csv",   parse_dates=["fyear"])
-    df_pe    = pd.read_csv(f"{data_path}/Compustat_PE.csv",    parse_dates=["fyear"])
-    df_mkt   = pd.read_csv(f"{data_path}/Compustat_2024_mkt_value.csv", parse_dates=["fyear"])
-    df_price = pd.read_csv(f"{data_path}/compustat_price.csv", parse_dates=["fyear"])
-    # 1) Read each CSV WITHOUT parse_dates for fyear
-    df_eps   = pd.read_csv(f"{data_path}/Compustat_eps.csv")
-    df_pe    = pd.read_csv(f"{data_path}/Compustat_PE.csv")
-    df_mkt   = pd.read_csv(f"{data_path}/Compustat_2024_mkt_value.csv")
-    df_price = pd.read_csv(f"{data_path}/compustat_price.csv")
+@st.cache_data
+def load_compustat_data():
+    # adjust paths if you put data folder elsewhere
+    path = "data/"
+    df_mkt  = pd.read_csv(path + "Compustat_2024_mkt_value.csv")
+    df_pe   = pd.read_csv(path + "Compustat_PE.csv")
+    df_eps  = pd.read_csv(path + "Compustat_eps.csv")
+    df_price= pd.read_csv(path + "compustat_price.csv")
+    base = "data/"
 
-    # 2) Merge stepwise on the six key fields
-    # 2) Ensure fyear is an integer (not a date)
-    for df in (df_eps, df_pe, df_mkt, df_price):
-        df["fyear"] = df["fyear"].astype(int)
+    # Merge on your chosen key — here I'm assuming 'tic' and 'fyear' exist
+    # Read each file and select only the columns we absolutely need
+    df_eps   = pd.read_csv(base + "Compustat_eps.csv",   usecols=["tic","fyear","EPS"])
+    df_pe    = pd.read_csv(base + "Compustat_PE.csv",    usecols=["tic","fyear","PE"])
+    df_price = pd.read_csv(base + "compustat_price.csv", usecols=["tic","fyear","Price"])
+    df_mkt   = pd.read_csv(base + "Compustat_2024_mkt_value.csv", 
+                           usecols=["tic","fyear","MktCap","gsubind"])
 
-    # 3) Merge on the six key columns
-on_keys = ["fyear", "tic", "conm", "cik", "gsubind", "sic"]
+    # Merge them one by one on tic + fyear
 df = (
 df_eps
-@@ -24,4 +28,3 @@ def load_compustat_data(data_path: str = "data") -> pd.DataFrame:
+.merge(df_pe,    on=["tic","fyear"], how="inner")
+        .merge(df_mkt,   on=["tic","fyear"], how="inner")
+.merge(df_price, on=["tic","fyear"], how="inner")
+        .merge(df_mkt,   on=["tic","fyear"], how="inner")
 )
 
+    # drop rows with missing or non-positive EPS/PE
+    df = df[(df["EPS"]  > 0) & (df["PE"]   > 0)]
+    # drop any non-positive or missing EPS/PE rows
+    df = df[(df.EPS  > 0) & (df.PE  > 0)]
 return df
