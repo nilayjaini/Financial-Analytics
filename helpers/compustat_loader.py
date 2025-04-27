@@ -1,11 +1,10 @@
-# helpers/compustat_loader.py
 import os
 import pandas as pd
 
 def load_compustat_data(data_path: str = "data/") -> pd.DataFrame:
     """
     Loads and merges Compustat data from CSV files located in data_path.
-    Returns a DataFrame containing only rows where eps > 0, PE > 0, and Price > 0.
+    Returns a DataFrame containing only rows where eps > 0, PE > 0, and Price > 0 for the same fiscal year.
     """
     # Define file paths
     eps_file    = os.path.join(data_path, "Compustat_eps.csv")
@@ -24,12 +23,12 @@ def load_compustat_data(data_path: str = "data/") -> pd.DataFrame:
     mkt_df = mkt_df.rename(columns={"2024_mkt_cap": "MktCap"})
     price_df = pd.read_csv(price_file, usecols=keys + ["Price"])          # Price
 
-    # Merge datasets sequentially on keys
-    df = eps_df.merge(pe_df, on=keys, how="inner")
+    # Merge datasets sequentially on keys for same fiscal year
+    df = eps_df.merge(pe_df,    on=keys, how="inner")
     df = df.merge(mkt_df, on=keys, how="inner")
     df = df.merge(price_df, on=keys, how="inner")
 
-    # Filter for positive values
+    # Filter for positive values in EPS, PE, and Price
     df = df[(df["eps"]   > 0) &
             (df["PE"]    > 0) &
             (df["Price"] > 0)]
