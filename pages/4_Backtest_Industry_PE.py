@@ -1,3 +1,4 @@
+# pages/4_Backtest_Industry_PE.py
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -14,13 +15,8 @@ data = load_compustat_data(data_path="data/")
 
 # Sidebar inputs
 st.sidebar.header("Backtest Inputs")
-ticker = st.sidebar.selectbox(
-    "Select ticker:",
-    options=sorted(data['tic'].unique())
-)
-horizon = st.sidebar.slider(
-    "Forecast horizon (years):", 1, 5, 1
-)
+ticker  = st.sidebar.selectbox("Select ticker:", options=sorted(data['tic'].unique()))
+horizon = st.sidebar.slider("Forecast horizon (years):", 1, 5, 1)
 
 # Retrieve sub-industry for selected ticker
 ticker_df = data[data['tic'] == ticker]
