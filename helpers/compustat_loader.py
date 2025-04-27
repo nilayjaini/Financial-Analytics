@@ -19,13 +19,13 @@ def load_compustat_data(data_path: str = "data/") -> pd.DataFrame:
     # Load each dataset and select only necessary columns to avoid overlaps
     eps_df = pd.read_csv(eps_file,    usecols=keys + ["eps"])             # EPS
     pe_df  = pd.read_csv(pe_file,     usecols=keys + ["P/E"])             # P/E
-    pe_df  = pe_df.rename(columns={"P/E": "PE"})                         # rename for consistency
+    pe_df  = pe_df.rename(columns={"P/E": "PE"})                        # rename for consistency
     mkt_df = pd.read_csv(mktcap_file, usecols=keys + ["2024_mkt_cap"])    # Market Cap
     mkt_df = mkt_df.rename(columns={"2024_mkt_cap": "MktCap"})
     price_df = pd.read_csv(price_file, usecols=keys + ["Price"])          # Price
 
     # Merge datasets sequentially on keys
-    df = eps_df.merge(pe_df,    on=keys, how="inner")
+    df = eps_df.merge(pe_df, on=keys, how="inner")
     df = df.merge(mkt_df, on=keys, how="inner")
     df = df.merge(price_df, on=keys, how="inner")
 
