@@ -68,28 +68,29 @@ if ticker_input:
         })
         price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
 
-        # 🎯 Full Hit Rate Calculation Across 2010 to 2022
+        # 🎯 Improved Hit Rate Calculation
         total_predictions = 0
         correct_predictions = 0
 
-        for year in range(2010, 2023):  # Only until 2022 (so that t+2 exists)
+        for year in range(2010, 2023):  # Check till 2022
             if year not in price_df['Year'].values:
                 continue
+
             model_pred = price_df.loc[price_df['Year'] == year, 'Prediction'].values[0]
 
-            # Check that actual prices exist
-            if (year in actual_price.index) and (year+1 in actual_price.index) and (year+2 in actual_price.index):
-                if pd.notna(actual_price.get(year)) and pd.notna(actual_price.get(year+1)) and pd.notna(actual_price.get(year+2)):
+            if pd.notna(actual_price.get(year)) and pd.notna(actual_price.get(year+1)):
+                actual_move_next = 'Up' if actual_price[year+1] > actual_price[year] else 'Down'
 
-                    actual_move_next = 'Up' if actual_price[year+1] > actual_price[year] else 'Down'
-                    actual_move_second = 'Up' if actual_price[year+2] > actual_price[year] else 'Down'
+                if model_pred == actual_move_next:
+                    correct_predictions += 1
+                total_predictions += 1
 
-                    if model_pred == actual_move_next:
-                        correct_predictions += 1
-                    if model_pred == actual_move_second:
-                        correct_predictions += 1
+            if pd.notna(actual_price.get(year)) and pd.notna(actual_price.get(year+2)):
+                actual_move_second = 'Up' if actual_price[year+2] > actual_price[year] else 'Down'
 
-                    total_predictions += 2  # two comparisons per year
+                if model_pred == actual_move_second:
+                    correct_predictions += 1
+                total_predictions += 1
 
         if total_predictions > 0:
             overall_hit_rate = (correct_predictions / total_predictions) * 100
