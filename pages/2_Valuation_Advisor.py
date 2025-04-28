@@ -1,48 +1,39 @@
-import streamlit as st
-from helpers.peer_lookup import get_peers
-from helpers.valuation_logic import analyze_valuation, plot_price_range
+# Load your company_data and pe_ratio_with_gsubind
+file_path = 'data/Master data price eps etc.xlsx'
+company_data = pd.read_excel(file_path, sheet_name='Company Dta', header=None)
+headers = company_data.iloc[3]
+company_data.columns = headers
+company_data = company_data.iloc[4:].reset_index(drop=True)
 
-st.set_page_config(layout="wide")
-st.title("💸 Valuation Advisor")
+ticker_data = company_data['Ticker'].reset_index(drop=True)
+gsubind_data = company_data['gsubind'].reset_index(drop=True)
 
-ticker_input = st.text_input("Enter a ticker symbol", "DELL")
+# Peer Lookup Logic
+ticker_input = ticker_input.upper()
+if ticker_input in ticker_data.values:
+    idx = ticker_data[ticker_data == ticker_input].index[0]
+    company_gsubind = gsubind_data[idx]
+    peer_indices = gsubind_data[gsubind_data == company_gsubind].index
+    peers = ticker_data.loc[peer_indices].tolist()
+    
+    # Display Peers
+    st.markdown(f"**Peers (Same gsubind):** {', '.join(peers)}")
 
-if ticker_input:
-    peers, sector, industry = get_peers(ticker_input.upper())
+    # Calculate Median PE of all peers (you need pe_ratio_with_gsubind loaded here)
+    pe_ratio = price_data.divide(eps_data)
+    pe_ratio_with_gsubind = pe_ratio.copy()
+    pe_ratio_with_gsubind['gsubind'] = gsubind_data.values
+    
+    peer_pe_ratios = pe_ratio_with_gsubind.loc[peer_indices]
+    industry_pe_avg = peer_pe_ratios[2024].median()  # Example: median for 2024
 
-    st.markdown(f"**Sector:** {sector}  ")
-    st.markdown(f"**Industry:** {industry}  ")
-    st.markdown(f"**Peers:** {', '.join(peers) if peers else 'N/A'}")
+    # Proceed with valuation
+    eps = eps_data.loc[idx, 2024]
+    current_price = price_data.loc[idx, 2024]
+    implied_price = eps * industry_pe_avg
 
-    if not peers:
-        st.warning("⚠️ Could not fetch peer data.")
-    else:
-        result = analyze_valuation(ticker_input.upper(), peers)
-
-        if not result['eps'] or not result['industry_pe_avg']:
-            st.warning("⚠️ EPS or P/E data not available — cannot perform valuation.")
-            st.stop()
-
-        st.subheader("📊 Key Valuation Inputs")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("EPS (TTM)", f"{result['eps']:.2f}")
-        col2.metric("Industry Avg P/E", f"{result['industry_pe_avg']:.2f}")
-        col3.metric("Current Stock Price", f"${result['current_price']:.2f}" if result['current_price'] else "N/A")
-
-        st.subheader("✅ Recommendation")
-        st.success(result['recommendation'])
-
-        st.subheader("📉 Valuation Range Visualization")
-        plot_price_range(
-            result['current_price'],
-            result['implied_price_min'],
-            result['implied_price_max'],
-            result['implied_price']
-        )
-
-        if result['implied_price']:
-            gap = ((result['implied_price'] - result['current_price']) / result['implied_price']) * 100
-            if gap > 0:
-                st.caption(f"📉 Current price is **{gap:.1f}% below** peer-based valuation average.")
-            else:
-                st.caption(f"📈 Current price is **{abs(gap):.1f}% above** peer-based valuation average.")
+    # Show results
+    st.metric("EPS (2024)", f"{eps:.2f}")
+    st.metric("Median P/E (Peers)", f"{industry_pe_avg:.2f}")
+    st.metric("Current Price (2024)", f"${current_price:.2f}")
+    st.metric("Implied Price (Valuation)", f"${implied_price:.2f}")
