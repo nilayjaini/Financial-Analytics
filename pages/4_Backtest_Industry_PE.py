@@ -54,7 +54,7 @@ if ticker_input:
         model_price = eps_row * median_pe_row
 
         try:
-            actual_row = actual_price_data.loc[ticker_input]
+            actual_price = actual_price_data.loc[ticker_input]
         except KeyError:
             st.error(f"Ticker '{ticker_input}' not found in 'Analysis' actual price data.")
             st.stop()
@@ -64,32 +64,33 @@ if ticker_input:
             'EPS': eps_row.values,
             'Median PE': median_pe_row.values,
             'Model Price': model_price.values,
-            'Actual Price': actual_row.values
+            'Actual Price': actual_price.values
         })
-        price_df['Prediction'] = np.where(model_price > actual_row, 'Up', 'Down')
+        price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
+        price_df.set_index('Year', inplace=True)
 
-        # ✅ Correct Hit Rate Calculation
+        # ✅ Correct and Final Hit Rate Calculation
         total_predictions = 0
         correct_predictions = 0
 
-        for year in range(2010, 2023):  # Till 2022 (because we compare to year+1 and year+2)
-
-            # Check if base year's actual price exists
-            if pd.isna(actual_row.get(year)):
+        for year in range(2010, 2023):  # Only till 2022
+            if year not in price_df.index:
                 continue
 
-            model_pred = price_df.loc[price_df['Year'] == year, 'Prediction'].values[0]
+            model_pred = price_df.loc[year, 'Prediction']
 
-            # Compare Year+1 if possible
-            if not pd.isna(actual_row.get(year+1)):
-                actual_move_next = 'Up' if actual_row[year+1] > actual_row[year] else 'Down'
+            base_price = actual_price.get(year)
+            price_next = actual_price.get(year + 1)
+            price_second = actual_price.get(year + 2)
+
+            if pd.notna(base_price) and pd.notna(price_next):
+                actual_move_next = 'Up' if price_next > base_price else 'Down'
                 if model_pred == actual_move_next:
                     correct_predictions += 1
                 total_predictions += 1
 
-            # Compare Year+2 if possible
-            if not pd.isna(actual_row.get(year+2)):
-                actual_move_second = 'Up' if actual_row[year+2] > actual_row[year] else 'Down'
+            if pd.notna(base_price) and pd.notna(price_second):
+                actual_move_second = 'Up' if price_second > base_price else 'Down'
                 if model_pred == actual_move_second:
                     correct_predictions += 1
                 total_predictions += 1
@@ -99,24 +100,24 @@ if ticker_input:
         else:
             overall_hit_rate = np.nan
 
-        # --- Show Results ---
+        # 🎯 Display Results
         st.subheader("🎯 Overall Prediction Hit Rate Analysis")
         st.markdown(f"**Total Valid Predictions:** {total_predictions}")
         st.markdown(f"**Correct Predictions:** {correct_predictions}")
+
         if not np.isnan(overall_hit_rate):
             st.success(f"✅ Overall Average Hit Rate: **{overall_hit_rate:.2f}%**")
         else:
             st.warning("Not enough data available to calculate hit rate.")
 
-        # --- Show Main Table ---
-        st.dataframe(price_df, use_container_width=True)
+        # 📊 Display the Prediction Table
+        st.dataframe(price_df.reset_index(), use_container_width=True)
 
-        # --- Final Prediction for 2024 ---
-        price_df.set_index('Year', inplace=True)
+        # 🔮 Final 2024 Prediction
         if 2024 in price_df.index and not pd.isna(price_df.loc[2024, 'Prediction']):
             st.success(f"🔮 Final Prediction for 2024: {price_df.loc[2024, 'Prediction']}")
         else:
-            st.warning("Prediction for 2024 is not available (missing data).")
+            st.warning("Prediction for 2024 is not available.")
 
     else:
         st.warning("Ticker not found. Please check and try again.")
