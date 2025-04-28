@@ -29,12 +29,12 @@ def load_data():
     median_pe_data_trimmed.columns = [None, None, 'gsubind'] + list(range(2010, 2025))
     gsubind_to_median_pe = {row['gsubind']: row[3:].values for _, row in median_pe_data_trimmed.iterrows()}
 
-    # Actual prices from Analysis sheet — includes ticker column (A) + Y6:AM6
+    # Actual prices from Analysis sheet
     analysis_data = pd.read_excel(file_path, sheet_name='Analysis', header=None)
-    analysis_data_trimmed = analysis_data.iloc[5:, :40].reset_index(drop=True)  # up to column AN
-    actual_price_data = analysis_data_trimmed.iloc[:, 24:39].apply(pd.to_numeric, errors='coerce')  # Y:AM = 2010–2024
+    analysis_data_trimmed = analysis_data.iloc[5:, :40].reset_index(drop=True)
+    actual_price_data = analysis_data_trimmed.iloc[:, 24:39].apply(pd.to_numeric, errors='coerce')
     actual_price_data.columns = list(range(2010, 2025))
-    actual_price_data.index = analysis_data_trimmed.iloc[:, 0]  # Set ticker as index
+    actual_price_data.index = analysis_data_trimmed.iloc[:, 0]
 
     return company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data
 
@@ -71,30 +71,37 @@ if ticker_input:
             'Model Price': model_price.values,
             'Actual Price': actual_price.values
         })
+
         price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
 
-        # --- Hit Rate Calculation ---
-        actual_movement_next_year = np.where(actual_price[2011] > actual_price[2010], 'Up', 'Down')
-        actual_movement_second_year = np.where(actual_price[2012] > actual_price[2010], 'Up', 'Down')
+        # --- Prediction Hit Rate Calculation ---
+        if not np.isnan(actual_price[2010]) and not np.isnan(actual_price[2011]) and not np.isnan(actual_price[2012]):
+            model_prediction_2010 = price_df.query("Year == 2010")['Prediction'].values[0]
 
-        model_prediction_2010 = price_df.loc[2010, 'Prediction']
+            actual_movement_next_year = 'Up' if actual_price[2011] > actual_price[2010] else 'Down'
+            actual_movement_second_year = 'Up' if actual_price[2012] > actual_price[2010] else 'Down'
 
-        correct_next_year = 1 if model_prediction_2010 == actual_movement_next_year else 0
-        correct_second_year = 1 if model_prediction_2010 == actual_movement_second_year else 0
+            correct_next_year = 1 if model_prediction_2010 == actual_movement_next_year else 0
+            correct_second_year = 1 if model_prediction_2010 == actual_movement_second_year else 0
 
-        total_predictions = 2  # two years
-        correct_predictions = correct_next_year + correct_second_year
-        hit_rate_percent = (correct_predictions / total_predictions) * 100
+            total_predictions = 2
+            correct_predictions = correct_next_year + correct_second_year
+            hit_rate_percent = (correct_predictions / total_predictions) * 100
 
-        # --- Display ---
-        st.subheader("🎯 Prediction Hit Rate Analysis")
-        st.markdown(f"**Prediction for 2010 was:** `{model_prediction_2010}`")
-        st.markdown(f"- 2011 Actual Movement: `{actual_movement_next_year}`")
-        st.markdown(f"- 2012 Actual Movement: `{actual_movement_second_year}`")
-        st.success(f"✅ Overall Prediction Hit Rate: **{hit_rate_percent:.2f}%** over 2 years")
+            # --- Display Hit Rate ---
+            st.subheader("🎯 Prediction Hit Rate Analysis")
+            st.markdown(f"**Prediction for 2010 was:** `{model_prediction_2010}`")
+            st.markdown(f"- 2011 Actual Movement: `{actual_movement_next_year}`")
+            st.markdown(f"- 2012 Actual Movement: `{actual_movement_second_year}`")
+            st.success(f"✅ Overall Prediction Hit Rate: **{hit_rate_percent:.2f}%** over 2 years")
 
+        else:
+            st.warning("⚠️ Not enough data for 2010/2011/2012 to calculate Hit Rate.")
+
+        # --- Show Main Table ---
         st.dataframe(price_df, use_container_width=True)
 
+        # --- Final Prediction for 2024 ---
         price_df.set_index('Year', inplace=True)
         if 2024 in price_df.index and not pd.isna(price_df.loc[2024, 'Prediction']):
             st.success(f"🔮 Final Prediction for 2024: {price_df.loc[2024, 'Prediction']}")
