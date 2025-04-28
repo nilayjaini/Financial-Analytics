@@ -6,16 +6,14 @@ import numpy as np
 @st.cache_data
 def load_data():
     file_path = 'data/Master data price eps etc.xlsx'
-    company_data = pd.read_excel(file_path, sheet_name='Company Dta', header=None)
-    median_pe = pd.read_excel(file_path, sheet_name='Median PE', header=None)
-    analysis_data = pd.read_excel(file_path, sheet_name='Analysis', header=None)
 
-    # Company Data Cleanup
+    # Load Company Dta sheet
+    company_data = pd.read_excel(file_path, sheet_name='Company Dta', header=None)
     headers = company_data.iloc[3]
     company_data.columns = headers
     company_data = company_data.iloc[4:].reset_index(drop=True)
 
-    # EPS and Price data
+    # EPS and Price from Company Dta
     eps_data = company_data.iloc[:, 9:24].apply(pd.to_numeric, errors='coerce')
     price_data = company_data.iloc[:, 24:39].apply(pd.to_numeric, errors='coerce')
     eps_data.columns = list(range(2010, 2025))
@@ -25,18 +23,22 @@ def load_data():
     ticker_data = company_data.iloc[:, 0].reset_index(drop=True)
     gsubind_data = company_data['gsubind'].reset_index(drop=True)
 
-    # Median PE Mapping
+    # Median PE
+    median_pe = pd.read_excel(file_path, sheet_name='Median PE', header=None)
     median_pe_data_trimmed = median_pe.iloc[5:, :18].reset_index(drop=True)
     median_pe_data_trimmed.columns = [None, None, 'gsubind'] + list(range(2010, 2025))
     gsubind_to_median_pe = {row['gsubind']: row[3:].values for _, row in median_pe_data_trimmed.iterrows()}
 
-    # Actual price data
-    actual_price_data = analysis_data.iloc[5:, 24:39].apply(pd.to_numeric, errors='coerce')
+    # Actual prices from Analysis sheet — includes ticker column (A) + Y6:AM6
+    analysis_data = pd.read_excel(file_path, sheet_name='Analysis', header=None)
+    analysis_data_trimmed = analysis_data.iloc[5:, :40].reset_index(drop=True)  # up to column AN
+    actual_price_data = analysis_data_trimmed.iloc[:, 24:39].apply(pd.to_numeric, errors='coerce')  # Y:AM = 2010–2024
     actual_price_data.columns = list(range(2010, 2025))
+    actual_price_data.index = analysis_data_trimmed.iloc[:, 0]  # Set ticker as index
 
     return company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data
 
-# Load everything
+# Load data
 company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data = load_data()
 years = list(range(2010, 2025))
 
@@ -50,20 +52,17 @@ if ticker_input:
 
         st.subheader(f"Details for: {ticker_input}")
         gsubind = gsubind_data[idx]
-        st.write("**gsubind:**", gsubind)
+        st.write("**gsubind:**", f"🧭 {gsubind}")
 
         eps_row = eps_data.loc[idx]
-        price_row = price_data.loc[idx]
         median_pe_row = pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
-
         model_price = eps_row * median_pe_row
-        if idx in actual_price_data.index:
-            actual_price = actual_price_data.loc[idx]
-        else:
-            st.error(f"Ticker index {idx} not found in actual_price_data.")
-            st.stop()
 
-        # actual_price = actual_price_data.loc[idx]
+        try:
+            actual_price = actual_price_data.loc[ticker_input]
+        except KeyError:
+            st.error(f"Ticker '{ticker_input}' not found in 'Analysis' actual price data.")
+            st.stop()
 
         price_df = pd.DataFrame({
             'Year': years,
@@ -76,8 +75,9 @@ if ticker_input:
 
         st.dataframe(price_df.set_index('Year'), use_container_width=True)
 
-        st.success(f"🔮 Final Prediction for 2024: {price_df.loc[2024, 'Prediction']}")
+        if not np.isnan(price_df.loc[2024, 'Prediction']):
+            st.success(f"🔮 Final Prediction for 2024: {price_df.loc[2024, 'Prediction']}")
+        else:
+            st.warning("Prediction for 2024 is not available (missing data).")
     else:
         st.warning("Ticker not found. Please check and try again.")
-
-
