@@ -69,28 +69,31 @@ if ticker_input:
         price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
         price_df.set_index('Year', inplace=True)
 
-        # ✅ Correct and Final Hit Rate Calculation
+        # ✅ Corrected Hit Rate Calculation
         total_predictions = 0
         correct_predictions = 0
 
-        for year in range(2010, 2023):  # Only till 2022
+        for year in range(2010, 2023):  # Check 2010 to 2022
             if year not in price_df.index:
                 continue
 
             model_pred = price_df.loc[year, 'Prediction']
-
             base_price = actual_price.get(year)
-            price_next = actual_price.get(year + 1)
-            price_second = actual_price.get(year + 2)
 
-            if pd.notna(base_price) and pd.notna(price_next):
-                actual_move_next = 'Up' if price_next > base_price else 'Down'
+            # Compare Year+1
+            if (year + 1) in actual_price.index and pd.notna(base_price) and pd.notna(actual_price.get(year + 1)):
+                next_price = actual_price.get(year + 1)
+                actual_move_next = 'Up' if next_price > base_price else 'Down'
+
                 if model_pred == actual_move_next:
                     correct_predictions += 1
                 total_predictions += 1
 
-            if pd.notna(base_price) and pd.notna(price_second):
-                actual_move_second = 'Up' if price_second > base_price else 'Down'
+            # Compare Year+2 (only if it exists)
+            if (year + 2) in actual_price.index and pd.notna(base_price) and pd.notna(actual_price.get(year + 2)):
+                second_price = actual_price.get(year + 2)
+                actual_move_second = 'Up' if second_price > base_price else 'Down'
+
                 if model_pred == actual_move_second:
                     correct_predictions += 1
                 total_predictions += 1
@@ -100,7 +103,7 @@ if ticker_input:
         else:
             overall_hit_rate = np.nan
 
-        # 🎯 Display Results
+        # 🎯 Display
         st.subheader("🎯 Overall Prediction Hit Rate Analysis")
         st.markdown(f"**Total Valid Predictions:** {total_predictions}")
         st.markdown(f"**Correct Predictions:** {correct_predictions}")
@@ -110,10 +113,10 @@ if ticker_input:
         else:
             st.warning("Not enough data available to calculate hit rate.")
 
-        # 📊 Display the Prediction Table
+        # 📊 Display Table
         st.dataframe(price_df.reset_index(), use_container_width=True)
 
-        # 🔮 Final 2024 Prediction
+        # 🔮 Final Prediction for 2024
         if 2024 in price_df.index and not pd.isna(price_df.loc[2024, 'Prediction']):
             st.success(f"🔮 Final Prediction for 2024: {price_df.loc[2024, 'Prediction']}")
         else:
