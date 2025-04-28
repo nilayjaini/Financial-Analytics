@@ -71,32 +71,45 @@ if ticker_input:
             'Model Price': model_price.values,
             'Actual Price': actual_price.values
         })
-
         price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
 
-        # --- Prediction Hit Rate Calculation ---
-        if not np.isnan(actual_price[2010]) and not np.isnan(actual_price[2011]) and not np.isnan(actual_price[2012]):
-            model_prediction_2010 = price_df.query("Year == 2010")['Prediction'].values[0]
+        # --- 🎯 Full Hit Rate Calculation Across All Years ---
+        total_predictions = 0
+        correct_predictions = 0
 
-            actual_movement_next_year = 'Up' if actual_price[2011] > actual_price[2010] else 'Down'
-            actual_movement_second_year = 'Up' if actual_price[2012] > actual_price[2010] else 'Down'
+        for year in range(2010, 2023):  # Only until 2022, because we need t+2
+            if year not in price_df.index:
+                continue
+            model_pred = price_df.loc[year, 'Prediction']
 
-            correct_next_year = 1 if model_prediction_2010 == actual_movement_next_year else 0
-            correct_second_year = 1 if model_prediction_2010 == actual_movement_second_year else 0
+            if np.isnan(actual_price.get(year)) or np.isnan(actual_price.get(year+1)) or np.isnan(actual_price.get(year+2)):
+                continue  # skip if data missing
 
-            total_predictions = 2
-            correct_predictions = correct_next_year + correct_second_year
-            hit_rate_percent = (correct_predictions / total_predictions) * 100
+            # Actual movement year t ➔ t+1
+            actual_move_next = 'Up' if actual_price[year+1] > actual_price[year] else 'Down'
+            # Actual movement year t ➔ t+2
+            actual_move_second = 'Up' if actual_price[year+2] > actual_price[year] else 'Down'
 
-            # --- Display Hit Rate ---
-            st.subheader("🎯 Prediction Hit Rate Analysis")
-            st.markdown(f"**Prediction for 2010 was:** `{model_prediction_2010}`")
-            st.markdown(f"- 2011 Actual Movement: `{actual_movement_next_year}`")
-            st.markdown(f"- 2012 Actual Movement: `{actual_movement_second_year}`")
-            st.success(f"✅ Overall Prediction Hit Rate: **{hit_rate_percent:.2f}%** over 2 years")
+            if model_pred == actual_move_next:
+                correct_predictions += 1
+            if model_pred == actual_move_second:
+                correct_predictions += 1
 
+            total_predictions += 2  # two comparisons per year
+
+        if total_predictions > 0:
+            overall_hit_rate = (correct_predictions / total_predictions) * 100
         else:
-            st.warning("⚠️ Not enough data for 2010/2011/2012 to calculate Hit Rate.")
+            overall_hit_rate = np.nan
+
+        # --- Show Results ---
+        st.subheader("🎯 Overall Prediction Hit Rate Analysis")
+        st.markdown(f"**Total Valid Predictions:** {total_predictions}")
+        st.markdown(f"**Correct Predictions:** {correct_predictions}")
+        if not np.isnan(overall_hit_rate):
+            st.success(f"✅ Overall Average Hit Rate: **{overall_hit_rate:.2f}%**")
+        else:
+            st.warning("Not enough data available to calculate hit rate.")
 
         # --- Show Main Table ---
         st.dataframe(price_df, use_container_width=True)
