@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# Load all required data
 @st.cache_data
 def load_data():
     file_path = 'data/Master data price eps etc.xlsx'
@@ -33,11 +32,9 @@ def load_data():
 
     return company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data
 
-# Load data
 company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data = load_data()
 years = list(range(2010, 2025))
 
-# Streamlit App
 st.title("📊 Company Stock Valuation Analysis")
 ticker_input = st.text_input("Enter Ticker (e.g., AAPL, DELL, etc.)").upper()
 
@@ -68,24 +65,26 @@ if ticker_input:
         })
         price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
 
-        # 🎯 Improved Hit Rate Calculation
+        # ✅ Absolute Correct Hit Rate Calculation
         total_predictions = 0
         correct_predictions = 0
 
-        for year in range(2010, 2023):  # Check till 2022
+        for year in range(2010, 2023):  # only till 2022
             if year not in price_df['Year'].values:
                 continue
 
             model_pred = price_df.loc[price_df['Year'] == year, 'Prediction'].values[0]
 
-            if pd.notna(actual_price.get(year)) and pd.notna(actual_price.get(year+1)):
+            # Compare Year+1 if possible
+            if (year+1 in actual_price.index) and pd.notna(actual_price.get(year+1)):
                 actual_move_next = 'Up' if actual_price[year+1] > actual_price[year] else 'Down'
 
                 if model_pred == actual_move_next:
                     correct_predictions += 1
                 total_predictions += 1
 
-            if pd.notna(actual_price.get(year)) and pd.notna(actual_price.get(year+2)):
+            # Compare Year+2 if possible
+            if (year+2 in actual_price.index) and pd.notna(actual_price.get(year+2)):
                 actual_move_second = 'Up' if actual_price[year+2] > actual_price[year] else 'Down'
 
                 if model_pred == actual_move_second:
