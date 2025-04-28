@@ -7,29 +7,24 @@ import numpy as np
 def load_data():
     file_path = 'data/Master data price eps etc.xlsx'
 
-    # Load Company Dta sheet
     company_data = pd.read_excel(file_path, sheet_name='Company Dta', header=None)
     headers = company_data.iloc[3]
     company_data.columns = headers
     company_data = company_data.iloc[4:].reset_index(drop=True)
 
-    # EPS and Price from Company Dta
     eps_data = company_data.iloc[:, 9:24].apply(pd.to_numeric, errors='coerce')
     price_data = company_data.iloc[:, 24:39].apply(pd.to_numeric, errors='coerce')
     eps_data.columns = list(range(2010, 2025))
     price_data.columns = list(range(2010, 2025))
 
-    # Metadata
     ticker_data = company_data.iloc[:, 0].reset_index(drop=True)
     gsubind_data = company_data['gsubind'].reset_index(drop=True)
 
-    # Median PE
     median_pe = pd.read_excel(file_path, sheet_name='Median PE', header=None)
     median_pe_data_trimmed = median_pe.iloc[5:, :18].reset_index(drop=True)
     median_pe_data_trimmed.columns = [None, None, 'gsubind'] + list(range(2010, 2025))
     gsubind_to_median_pe = {row['gsubind']: row[3:].values for _, row in median_pe_data_trimmed.iterrows()}
 
-    # Actual prices from Analysis sheet
     analysis_data = pd.read_excel(file_path, sheet_name='Analysis', header=None)
     analysis_data_trimmed = analysis_data.iloc[5:, :40].reset_index(drop=True)
     actual_price_data = analysis_data_trimmed.iloc[:, 24:39].apply(pd.to_numeric, errors='coerce')
@@ -73,29 +68,28 @@ if ticker_input:
         })
         price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
 
-        # --- 🎯 Full Hit Rate Calculation Across All Years ---
+        # 🎯 Full Hit Rate Calculation Across 2010 to 2022
         total_predictions = 0
         correct_predictions = 0
 
-        for year in range(2010, 2023):  # Only until 2022, because we need t+2
-            if year not in price_df.index:
+        for year in range(2010, 2023):  # Only until 2022 (so that t+2 exists)
+            if year not in price_df['Year'].values:
                 continue
-            model_pred = price_df.loc[year, 'Prediction']
+            model_pred = price_df.loc[price_df['Year'] == year, 'Prediction'].values[0]
 
-            if np.isnan(actual_price.get(year)) or np.isnan(actual_price.get(year+1)) or np.isnan(actual_price.get(year+2)):
-                continue  # skip if data missing
+            # Check that actual prices exist
+            if (year in actual_price.index) and (year+1 in actual_price.index) and (year+2 in actual_price.index):
+                if pd.notna(actual_price.get(year)) and pd.notna(actual_price.get(year+1)) and pd.notna(actual_price.get(year+2)):
 
-            # Actual movement year t ➔ t+1
-            actual_move_next = 'Up' if actual_price[year+1] > actual_price[year] else 'Down'
-            # Actual movement year t ➔ t+2
-            actual_move_second = 'Up' if actual_price[year+2] > actual_price[year] else 'Down'
+                    actual_move_next = 'Up' if actual_price[year+1] > actual_price[year] else 'Down'
+                    actual_move_second = 'Up' if actual_price[year+2] > actual_price[year] else 'Down'
 
-            if model_pred == actual_move_next:
-                correct_predictions += 1
-            if model_pred == actual_move_second:
-                correct_predictions += 1
+                    if model_pred == actual_move_next:
+                        correct_predictions += 1
+                    if model_pred == actual_move_second:
+                        correct_predictions += 1
 
-            total_predictions += 2  # two comparisons per year
+                    total_predictions += 2  # two comparisons per year
 
         if total_predictions > 0:
             overall_hit_rate = (correct_predictions / total_predictions) * 100
