@@ -1,5 +1,10 @@
 # Load your company_data and pe_ratio_with_gsubind
 file_path = 'data/Master data price eps etc.xlsx'
+@st.cache_data
+def load_company_data():
+    return pd.read_excel(file_path, sheet_name='Company Dta', header=None)
+
+company_data = load_company_data()
 company_data = pd.read_excel(file_path, sheet_name='Company Dta', header=None)
 headers = company_data.iloc[3]
 company_data.columns = headers
