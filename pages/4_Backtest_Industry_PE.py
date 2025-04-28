@@ -28,7 +28,7 @@ def load_data():
     analysis_data_trimmed = analysis_data.iloc[5:, :40].reset_index(drop=True)
     actual_price_data = analysis_data_trimmed.iloc[:, 24:39].apply(pd.to_numeric, errors='coerce')
     actual_price_data.columns = list(range(2010, 2025))
-    actual_price_data.index = analysis_data_trimmed.iloc[:, 0]
+    actual_price_data['Ticker'] = analysis_data_trimmed.iloc[:, 0]
 
     return company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data
 
@@ -50,46 +50,41 @@ if ticker_input:
         median_pe_row = pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
         model_price = eps_row * median_pe_row
 
-        try:
-            actual_price = actual_price_data.loc[ticker_input]
-        except KeyError:
-            st.error(f"Ticker '{ticker_input}' not found in 'Analysis' actual price data.")
-            st.stop()
+        # Get actual price row correctly
+        actual_row = actual_price_data[actual_price_data['Ticker'] == ticker_input]
+        actual_row = actual_row.drop(columns='Ticker').squeeze()
 
         price_df = pd.DataFrame({
             'Year': years,
             'EPS': eps_row.values,
             'Median PE': median_pe_row.values,
             'Model Price': model_price.values,
-            'Actual Price': actual_price.values
+            'Actual Price': actual_row.values
         })
-        price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
+        price_df['Prediction'] = np.where(model_price > actual_row, 'Up', 'Down')
 
-        # ✅ Absolute Correct Hit Rate Calculation
+        # ✅ Finally Correct Hit Rate Calculation
         total_predictions = 0
         correct_predictions = 0
 
-        for year in range(2010, 2023):  # only till 2022
-            if year not in price_df['Year'].values:
-                continue
-
+        for year in range(2010, 2023):  # till 2022
             model_pred = price_df.loc[price_df['Year'] == year, 'Prediction'].values[0]
 
-            # Compare Year+1 if possible
-            if (year+1 in actual_price.index) and pd.notna(actual_price.get(year+1)):
-                actual_move_next = 'Up' if actual_price[year+1] > actual_price[year] else 'Down'
+            if not pd.isna(actual_row.get(year)):
 
-                if model_pred == actual_move_next:
-                    correct_predictions += 1
-                total_predictions += 1
+                # year+1
+                if (year+1) in actual_row.index and not pd.isna(actual_row.get(year+1)):
+                    actual_move_next = 'Up' if actual_row[year+1] > actual_row[year] else 'Down'
+                    if model_pred == actual_move_next:
+                        correct_predictions += 1
+                    total_predictions += 1
 
-            # Compare Year+2 if possible
-            if (year+2 in actual_price.index) and pd.notna(actual_price.get(year+2)):
-                actual_move_second = 'Up' if actual_price[year+2] > actual_price[year] else 'Down'
-
-                if model_pred == actual_move_second:
-                    correct_predictions += 1
-                total_predictions += 1
+                # year+2
+                if (year+2) in actual_row.index and not pd.isna(actual_row.get(year+2)):
+                    actual_move_second = 'Up' if actual_row[year+2] > actual_row[year] else 'Down'
+                    if model_pred == actual_move_second:
+                        correct_predictions += 1
+                    total_predictions += 1
 
         if total_predictions > 0:
             overall_hit_rate = (correct_predictions / total_predictions) * 100
