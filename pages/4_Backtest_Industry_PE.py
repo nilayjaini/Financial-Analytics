@@ -72,6 +72,28 @@ if ticker_input:
             'Actual Price': actual_price.values
         })
         price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
+# ➡️ Step 1: Define actual movements (for next year and second year)
+actual_movement_next_year = np.where(actual_price[2011] > actual_price[2010], 'Up', 'Down')
+actual_movement_second_year = np.where(actual_price[2012] > actual_price[2010], 'Up', 'Down')
+
+# ➡️ Step 2: Get the model prediction for 2010
+model_prediction_2010 = price_df.loc[2010, 'Prediction']
+
+# ➡️ Step 3: Check if prediction matches actual movement
+correct_next_year = 1 if model_prediction_2010 == actual_movement_next_year else 0
+correct_second_year = 1 if model_prediction_2010 == actual_movement_second_year else 0
+
+# ➡️ Step 4: Calculate Hit Rate
+total_predictions = 2  # next year + second year
+correct_predictions = correct_next_year + correct_second_year
+hit_rate_percent = (correct_predictions / total_predictions) * 100
+
+# ➡️ Step 5: Display
+st.subheader("🎯 Prediction Hit Rate Analysis")
+st.markdown(f"**Prediction for 2010 was:** `{model_prediction_2010}`")
+st.markdown(f"- 2011 Actual Movement: `{actual_movement_next_year}`")
+st.markdown(f"- 2012 Actual Movement: `{actual_movement_second_year}`")
+st.success(f"✅ Overall Prediction Hit Rate: **{hit_rate_percent:.2f}%** over 2 years")
 
         st.dataframe(price_df, use_container_width=True)
         price_df.set_index('Year', inplace=True)
