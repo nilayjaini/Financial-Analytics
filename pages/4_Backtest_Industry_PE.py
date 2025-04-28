@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# Load all required data
 @st.cache_data
 def load_data():
     file_path = 'data/Master data price eps etc.xlsx'
@@ -33,11 +32,9 @@ def load_data():
 
     return company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data
 
-# Load data
 company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data = load_data()
 years = list(range(2010, 2025))
 
-# Streamlit App
 st.title("📊 Company Stock Valuation Analysis")
 ticker_input = st.text_input("Enter Ticker (e.g., AAPL, DELL, etc.)").upper()
 
@@ -69,32 +66,34 @@ if ticker_input:
         price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
         price_df.set_index('Year', inplace=True)
 
-        # ✅ Corrected Hit Rate Calculation
+        # ✅ Correct and Final Hit Rate Calculation
         total_predictions = 0
         correct_predictions = 0
 
-        for year in range(2010, 2023):  # Check 2010 to 2022
-            if year not in price_df.index:
+        for base_year in range(2010, 2023):  # 2010 to 2022 (to allow t+1 and t+2 check)
+            if base_year not in price_df.index:
                 continue
 
-            model_pred = price_df.loc[year, 'Prediction']
-            base_price = actual_price.get(year)
+            base_prediction = price_df.loc[base_year, 'Prediction']
+            base_actual_price = actual_price.get(base_year)
 
-            # Compare Year+1
-            if (year + 1) in actual_price.index and pd.notna(base_price) and pd.notna(actual_price.get(year + 1)):
-                next_price = actual_price.get(year + 1)
-                actual_move_next = 'Up' if next_price > base_price else 'Down'
+            # check base year exists
+            if pd.isna(base_actual_price):
+                continue
 
-                if model_pred == actual_move_next:
+            # 1-year ahead (t+1)
+            next_year = base_year + 1
+            if next_year in actual_price.index and pd.notna(actual_price.get(next_year)):
+                move = 'Up' if actual_price[next_year] > base_actual_price else 'Down'
+                if move == base_prediction:
                     correct_predictions += 1
                 total_predictions += 1
 
-            # Compare Year+2 (only if it exists)
-            if (year + 2) in actual_price.index and pd.notna(base_price) and pd.notna(actual_price.get(year + 2)):
-                second_price = actual_price.get(year + 2)
-                actual_move_second = 'Up' if second_price > base_price else 'Down'
-
-                if model_pred == actual_move_second:
+            # 2-year ahead (t+2)
+            second_year = base_year + 2
+            if second_year in actual_price.index and pd.notna(actual_price.get(second_year)):
+                move = 'Up' if actual_price[second_year] > base_actual_price else 'Down'
+                if move == base_prediction:
                     correct_predictions += 1
                 total_predictions += 1
 
@@ -103,7 +102,6 @@ if ticker_input:
         else:
             overall_hit_rate = np.nan
 
-        # 🎯 Display
         st.subheader("🎯 Overall Prediction Hit Rate Analysis")
         st.markdown(f"**Total Valid Predictions:** {total_predictions}")
         st.markdown(f"**Correct Predictions:** {correct_predictions}")
@@ -111,12 +109,10 @@ if ticker_input:
         if not np.isnan(overall_hit_rate):
             st.success(f"✅ Overall Average Hit Rate: **{overall_hit_rate:.2f}%**")
         else:
-            st.warning("Not enough data available to calculate hit rate.")
+            st.warning("Not enough data to calculate hit rate.")
 
-        # 📊 Display Table
         st.dataframe(price_df.reset_index(), use_container_width=True)
 
-        # 🔮 Final Prediction for 2024
         if 2024 in price_df.index and not pd.isna(price_df.loc[2024, 'Prediction']):
             st.success(f"🔮 Final Prediction for 2024: {price_df.loc[2024, 'Prediction']}")
         else:
