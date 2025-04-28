@@ -57,7 +57,13 @@ if ticker_input:
         median_pe_row = pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
 
         model_price = eps_row * median_pe_row
-        actual_price = actual_price_data.loc[idx]
+        if idx in actual_price_data.index:
+            actual_price = actual_price_data.loc[idx]
+        else:
+            st.error(f"Ticker index {idx} not found in actual_price_data.")
+            st.stop()
+
+        # actual_price = actual_price_data.loc[idx]
 
         price_df = pd.DataFrame({
             'Year': years,
