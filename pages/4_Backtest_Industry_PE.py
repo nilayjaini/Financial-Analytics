@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+# Load all required data
 @st.cache_data
 def load_data():
     file_path = 'data/Master data price eps etc.xlsx'
@@ -28,13 +29,15 @@ def load_data():
     analysis_data_trimmed = analysis_data.iloc[5:, :40].reset_index(drop=True)
     actual_price_data = analysis_data_trimmed.iloc[:, 24:39].apply(pd.to_numeric, errors='coerce')
     actual_price_data.columns = list(range(2010, 2025))
-    actual_price_data['Ticker'] = analysis_data_trimmed.iloc[:, 0]
+    actual_price_data.index = analysis_data_trimmed.iloc[:, 0]
 
     return company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data
 
+# Load data
 company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data = load_data()
 years = list(range(2010, 2025))
 
+# Streamlit App
 st.title("📊 Company Stock Valuation Analysis")
 ticker_input = st.text_input("Enter Ticker (e.g., AAPL, DELL, etc.)").upper()
 
@@ -50,9 +53,11 @@ if ticker_input:
         median_pe_row = pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
         model_price = eps_row * median_pe_row
 
-        # Get actual price row correctly
-        actual_row = actual_price_data[actual_price_data['Ticker'] == ticker_input]
-        actual_row = actual_row.drop(columns='Ticker').squeeze()
+        try:
+            actual_row = actual_price_data.loc[ticker_input]
+        except KeyError:
+            st.error(f"Ticker '{ticker_input}' not found in 'Analysis' actual price data.")
+            st.stop()
 
         price_df = pd.DataFrame({
             'Year': years,
@@ -63,28 +68,31 @@ if ticker_input:
         })
         price_df['Prediction'] = np.where(model_price > actual_row, 'Up', 'Down')
 
-        # ✅ Finally Correct Hit Rate Calculation
+        # ✅ Correct Hit Rate Calculation
         total_predictions = 0
         correct_predictions = 0
 
-        for year in range(2010, 2023):  # till 2022
+        for year in range(2010, 2023):  # Till 2022 (because we compare to year+1 and year+2)
+
+            # Check if base year's actual price exists
+            if pd.isna(actual_row.get(year)):
+                continue
+
             model_pred = price_df.loc[price_df['Year'] == year, 'Prediction'].values[0]
 
-            if not pd.isna(actual_row.get(year)):
+            # Compare Year+1 if possible
+            if not pd.isna(actual_row.get(year+1)):
+                actual_move_next = 'Up' if actual_row[year+1] > actual_row[year] else 'Down'
+                if model_pred == actual_move_next:
+                    correct_predictions += 1
+                total_predictions += 1
 
-                # year+1
-                if (year+1) in actual_row.index and not pd.isna(actual_row.get(year+1)):
-                    actual_move_next = 'Up' if actual_row[year+1] > actual_row[year] else 'Down'
-                    if model_pred == actual_move_next:
-                        correct_predictions += 1
-                    total_predictions += 1
-
-                # year+2
-                if (year+2) in actual_row.index and not pd.isna(actual_row.get(year+2)):
-                    actual_move_second = 'Up' if actual_row[year+2] > actual_row[year] else 'Down'
-                    if model_pred == actual_move_second:
-                        correct_predictions += 1
-                    total_predictions += 1
+            # Compare Year+2 if possible
+            if not pd.isna(actual_row.get(year+2)):
+                actual_move_second = 'Up' if actual_row[year+2] > actual_row[year] else 'Down'
+                if model_pred == actual_move_second:
+                    correct_predictions += 1
+                total_predictions += 1
 
         if total_predictions > 0:
             overall_hit_rate = (correct_predictions / total_predictions) * 100
