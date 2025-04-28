@@ -89,26 +89,66 @@ st.subheader("📉 Valuation Range Visualization")
 
 # Ensure min, max are valid and not negative or extreme
 valid_peer_pe = peer_pe_ratios[2024].dropna()
+import matplotlib.pyplot as plt
+
+# Assuming eps, current_price, valid_peer_pe, implied_price are defined earlier
 if not valid_peer_pe.empty and eps > 0:
     implied_price_min = eps * valid_peer_pe.min()
     implied_price_max = eps * valid_peer_pe.max()
-    fig, ax = plt.subplots(figsize=(8, 1.5))
+    implied_price_avg = implied_price
 
-    ax.plot([implied_price_min, implied_price_max], [0, 0], color='gray', linewidth=10, alpha=0.3)
-    ax.plot(implied_price, 0, 'b|', markersize=30, label='Avg Implied Price')
-    ax.plot(current_price, 0, 'ro', markersize=12, label='Current Price')
+    fig, ax = plt.subplots(figsize=(10, 2))
+
+    # Gray bar: Implied price range
+    ax.hlines(1, implied_price_min, implied_price_max, color='gray', linewidth=10, alpha=0.4)
+
+    # Blue line: Avg implied price
+    ax.vlines(implied_price_avg, 0.9, 1.1, color='blue', linewidth=2, label='Avg Implied Price')
+
+    # Red dot: Current price
+    ax.plot(current_price, 1, 'ro', markersize=10, label='Current Price')
+
+    # Add text labels for min, avg, max
+    ax.text(implied_price_min, 1.15, f"Low: ${implied_price_min:.2f}", ha='left', fontsize=9)
+    ax.text(implied_price_avg, 1.15, f"Avg: ${implied_price_avg:.2f}", ha='center', fontsize=9, color='blue')
+    ax.text(implied_price_max, 1.15, f"High: ${implied_price_max:.2f}", ha='right', fontsize=9)
 
     ax.set_xlim([implied_price_min * 0.9, implied_price_max * 1.1])
-    ax.set_yticks([])
-    ax.set_xlabel('Price Range')
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=2)
+    ax.set_ylim([0.8, 1.2])
+    ax.axis('off')
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.3), ncol=2)
 
     st.pyplot(fig)
 
-    gap = ((implied_price - current_price) / implied_price) * 100
+    # Caption on valuation gap
+    gap = ((implied_price_avg - current_price) / implied_price_avg) * 100
     if gap > 0:
-        st.caption(f"📉 Current price is **{gap:.1f}% below** peer-based valuation average.")
+        st.caption(f"📉 Current price is **{gap:.1f}% below** the implied valuation average.")
     else:
-        st.caption(f"📈 Current price is **{abs(gap):.1f}% above** peer-based valuation average.")
+        st.caption(f"📈 Current price is **{abs(gap):.1f}% above** the implied valuation average.")
 else:
     st.warning("⚠️ Not enough valid peer data to create a proper visualization.")
+
+# if not valid_peer_pe.empty and eps > 0:
+#     implied_price_min = eps * valid_peer_pe.min()
+#     implied_price_max = eps * valid_peer_pe.max()
+#     fig, ax = plt.subplots(figsize=(8, 1.5))
+
+#     ax.plot([implied_price_min, implied_price_max], [0, 0], color='gray', linewidth=10, alpha=0.3)
+#     ax.plot(implied_price, 0, 'b|', markersize=30, label='Avg Implied Price')
+#     ax.plot(current_price, 0, 'ro', markersize=12, label='Current Price')
+
+#     ax.set_xlim([implied_price_min * 0.9, implied_price_max * 1.1])
+#     ax.set_yticks([])
+#     ax.set_xlabel('Price Range')
+#     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=2)
+
+#     st.pyplot(fig)
+
+#     gap = ((implied_price - current_price) / implied_price) * 100
+#     if gap > 0:
+#         st.caption(f"📉 Current price is **{gap:.1f}% below** peer-based valuation average.")
+#     else:
+#         st.caption(f"📈 Current price is **{abs(gap):.1f}% above** peer-based valuation average.")
+# else:
+#     st.warning("⚠️ Not enough valid peer data to create a proper visualization.")
