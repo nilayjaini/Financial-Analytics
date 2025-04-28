@@ -5,7 +5,7 @@ import numpy as np
 # Load all required data
 @st.cache_data
 def load_data():
-    file_path = 'data/Master data price eps etc.xlsb'
+    file_path = 'data/Master data price eps etc.xlsx'
     company_data = pd.read_excel(file_path, sheet_name='Company Dta', engine='pyxlsb', header=None)
     median_pe = pd.read_excel(file_path, sheet_name='Median PE', engine='pyxlsb', header=None)
     analysis_data = pd.read_excel(file_path, sheet_name='Analysis', engine='pyxlsb', header=None)
