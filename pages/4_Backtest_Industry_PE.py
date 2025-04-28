@@ -73,11 +73,12 @@ if ticker_input:
         })
         price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
 
-        st.dataframe(price_df.set_index('Year'), use_container_width=True)
-
-        if not np.isnan(price_df.loc[2024, 'Prediction']):
+        st.dataframe(price_df, use_container_width=True)
+        price_df.set_index('Year', inplace=True)
+        if 2024 in price_df.index and not pd.isna(price_df.loc[2024, 'Prediction']):
             st.success(f"🔮 Final Prediction for 2024: {price_df.loc[2024, 'Prediction']}")
         else:
             st.warning("Prediction for 2024 is not available (missing data).")
+
     else:
         st.warning("Ticker not found. Please check and try again.")
