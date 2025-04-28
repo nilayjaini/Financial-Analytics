@@ -6,9 +6,9 @@ import numpy as np
 @st.cache_data
 def load_data():
     file_path = 'data/Master data price eps etc.xlsx'
-    company_data = pd.read_excel(file_path, sheet_name='Company Dta', engine='pyxlsb', header=None)
-    median_pe = pd.read_excel(file_path, sheet_name='Median PE', engine='pyxlsb', header=None)
-    analysis_data = pd.read_excel(file_path, sheet_name='Analysis', engine='pyxlsb', header=None)
+    company_data = pd.read_excel(file_path, sheet_name='Company Dta', header=None)
+    median_pe = pd.read_excel(file_path, sheet_name='Median PE', header=None)
+    analysis_data = pd.read_excel(file_path, sheet_name='Analysis', header=None)
 
     # Company Data Cleanup
     headers = company_data.iloc[3]
