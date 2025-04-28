@@ -84,14 +84,25 @@ if ticker_input and ticker_input in ticker_data.values:
         st.warning("📉 Likely Overvalued — Exercise Caution")
 
     # Visualization
-    st.subheader("📉 Valuation Range Visualization")
-    fig, ax = plt.subplots(figsize=(8, 2))
-    ax.axhline(implied_price, color='blue', linewidth=2, label='Avg Implied Price')
-    ax.plot(current_price, 0, 'ro', label='Current Price')
+    # Visualization
+st.subheader("📉 Valuation Range Visualization")
+
+# Ensure min, max are valid and not negative or extreme
+valid_peer_pe = peer_pe_ratios[2024].dropna()
+if not valid_peer_pe.empty and eps > 0:
+    implied_price_min = eps * valid_peer_pe.min()
+    implied_price_max = eps * valid_peer_pe.max()
+    fig, ax = plt.subplots(figsize=(8, 1.5))
+
+    ax.plot([implied_price_min, implied_price_max], [0, 0], color='gray', linewidth=10, alpha=0.3)
+    ax.plot(implied_price, 0, 'b|', markersize=30, label='Avg Implied Price')
+    ax.plot(current_price, 0, 'ro', markersize=12, label='Current Price')
+
     ax.set_xlim([implied_price_min * 0.9, implied_price_max * 1.1])
     ax.set_yticks([])
     ax.set_xlabel('Price Range')
-    ax.legend()
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=2)
+
     st.pyplot(fig)
 
     gap = ((implied_price - current_price) / implied_price) * 100
@@ -100,4 +111,4 @@ if ticker_input and ticker_input in ticker_data.values:
     else:
         st.caption(f"📈 Current price is **{abs(gap):.1f}% above** peer-based valuation average.")
 else:
-    st.warning("Ticker not found. Please check and try again.")
+    st.warning("⚠️ Not enough valid peer data to create a proper visualization.")
