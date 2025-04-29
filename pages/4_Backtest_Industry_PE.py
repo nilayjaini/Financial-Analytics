@@ -186,7 +186,7 @@ if ticker_input:
                 peer_median_pe_row = pd.Series(gsubind_to_median_pe.get(peer_gsubind, [None]*len(years)), index=years)
                 peer_model_price = peer_eps_row * peer_median_pe_row
 
-                for year in range(2010, 2023):
+                for year in range(2010, 2025):
                     if pd.isna(peer_model_price.get(year)):
                         continue
 
