@@ -35,6 +35,10 @@ def load_eps_price_data(df):
 company_data = load_company_data()
 eps_data, price_data, ticker_data, gsubind_data = load_eps_price_data(company_data)
 
+# Clean EPS: Set EPS <= 0 to NaN
+clean_eps_data = eps_data.copy()
+clean_eps_data[clean_eps_data <= 0] = np.nan
+
 # Input
 ticker_input = st.text_input("Enter a ticker symbol", "DELL").upper()
 
@@ -47,25 +51,17 @@ if ticker_input and ticker_input in ticker_data.values:
     peers = ticker_data.loc[peer_indices].tolist()
 
     # Show sector/industry
-    sector = company_data.loc[idx, 'Industry'] if 'Industry' in company_data.columns else "N/A"
+    sector = company_data.loc[idx, 'Sector'] if 'Sector' in company_data.columns else "N/A"
     industry = company_data.loc[idx, 'Industry'] if 'Industry' in company_data.columns else "N/A"
 
     st.markdown(f"**Sector:** {sector}  ")
     st.markdown(f"**Industry:** {industry}  ")
     st.markdown(f"**Peers:** {', '.join(peers)}")
 
-    # --- ✨ Correct cleaning starts here ---
-    clean_eps_data = eps_data.copy()
-    clean_eps_data[clean_eps_data <= 0] = np.nan
-
+    # Calculate Median P/E for all peers (cleaned)
     pe_ratio = price_data.divide(clean_eps_data)
-    pe_ratio_with_gsubind = pe_ratio.copy()
-    pe_ratio_with_gsubind['gsubind'] = gsubind_data.values
-
-    peer_pe_ratios = pe_ratio_with_gsubind.loc[peer_indices]
-
-    valid_peer_pe = peer_pe_ratios[2024].dropna()
-    valid_peer_pe = valid_peer_pe[(valid_peer_pe > 0) & (valid_peer_pe < 200)]  # Keep only reasonable P/Es
+    valid_peer_pe = pe_ratio.loc[peer_indices, 2024].dropna()
+    valid_peer_pe = valid_peer_pe[(valid_peer_pe > 0) & (valid_peer_pe < 200)]
 
     industry_pe_avg = valid_peer_pe.median() if not valid_peer_pe.empty else np.nan
 
@@ -83,7 +79,7 @@ if ticker_input and ticker_input in ticker_data.values:
     col2.metric("Industry Median P/E", f"{industry_pe_avg:.2f}" if pd.notna(industry_pe_avg) else "N/A")
     col3.metric("Current Price (2024)", f"${current_price:.2f}" if pd.notna(current_price) else "N/A")
 
-    # Recommendation
+    # Recommendation Logic
     st.subheader("✅ Recommendation")
     if pd.notna(implied_price_avg) and pd.notna(current_price):
         if implied_price_avg > current_price:
@@ -91,19 +87,24 @@ if ticker_input and ticker_input in ticker_data.values:
         else:
             st.warning("📉 Likely Overvalued — Exercise Caution")
     else:
-        st.info("❓ Not enough data to make a recommendation.")
+        st.info("Not enough data to provide a recommendation.")
 
-    # --- 📉 Visualization ---
+    # Visualization
     st.subheader("📉 Valuation Range Visualization")
 
-    if pd.notna(implied_price_min) and pd.notna(implied_price_max) and pd.notna(implied_price_avg) and eps > 0:
+    if pd.notna(implied_price_min) and pd.notna(implied_price_max) and pd.notna(implied_price_avg):
         fig, ax = plt.subplots(figsize=(10, 2))
 
+        # Gray bar: Implied price range
         ax.hlines(1, implied_price_min, implied_price_max, color='gray', linewidth=10, alpha=0.4)
 
+        # Blue line: Avg implied price
         ax.vlines(implied_price_avg, 0.9, 1.1, color='blue', linewidth=2, label='Avg Implied Price')
+
+        # Red dot: Current price
         ax.plot(current_price, 1, 'ro', markersize=10, label='Current Price')
 
+        # Add text labels
         ax.text(implied_price_min, 1.15, f"Low: ${implied_price_min:.2f}", ha='left', fontsize=9)
         ax.text(implied_price_avg, 1.15, f"Avg: ${implied_price_avg:.2f}", ha='center', fontsize=9, color='blue')
         ax.text(implied_price_max, 1.15, f"High: ${implied_price_max:.2f}", ha='right', fontsize=9)
@@ -122,3 +123,7 @@ if ticker_input and ticker_input in ticker_data.values:
             st.caption(f"📈 Current price is **{abs(gap):.1f}% above** the implied valuation average.")
     else:
         st.warning("⚠️ Not enough valid peer data to create a proper visualization.")
+
+else:
+    if ticker_input:
+        st.error("Ticker not found. Please check and try again.")
