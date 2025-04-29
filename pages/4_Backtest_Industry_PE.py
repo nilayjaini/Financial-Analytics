@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -39,7 +41,7 @@ def load_data():
 company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data = load_data()
 years = list(range(2010, 2025))
 
-st.title("\ud83d\udcca Company Stock Valuation Analysis")
+st.title("📊 Company Stock Valuation Analysis")
 ticker_input = st.text_input("Enter Ticker (e.g., AAPL, DELL, etc.)").upper()
 
 if ticker_input:
@@ -48,7 +50,7 @@ if ticker_input:
 
         st.subheader(f"Details for: {ticker_input}")
         gsubind = gsubind_data[idx]
-        st.write("**gsubind:**", f"\ud83d\udec3 {gsubind}")
+        st.write("**gsubind:**", f"🧭 {gsubind}")
 
         eps_row = eps_data.loc[idx]
         median_pe_row = pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
@@ -95,11 +97,11 @@ if ticker_input:
         else:
             overall_hit_rate = np.nan
 
-        st.subheader("\ud83c\udfaf Overall Prediction Hit Rate Analysis")
+        st.subheader("🎯 Overall Prediction Hit Rate Analysis")
         st.markdown(f"**Total Valid Predictions:** {total_predictions}")
         st.markdown(f"**Correct Predictions:** {correct_predictions}")
         if not np.isnan(overall_hit_rate):
-            st.success(f"\u2705 Overall Average Hit Rate: **{overall_hit_rate:.2f}%**")
+            st.success(f"✅ Overall Average Hit Rate: **{overall_hit_rate:.2f}%**")
         else:
             st.warning("Not enough data available to calculate hit rate.")
 
@@ -107,11 +109,73 @@ if ticker_input:
 
         price_df.set_index('Year', inplace=True)
         if 2024 in price_df.index and not pd.isna(price_df.loc[2024, 'Prediction']):
-            st.success(f"\ud83e\udd16 Final Prediction for 2024: {price_df.loc[2024, 'Prediction']}")
+            st.success(f"🔮 Final Prediction for 2024: {price_df.loc[2024, 'Prediction']}")
         else:
             st.warning("Prediction for 2024 is not available (missing data).")
 
-        # --- Now also calculate overall model average accuracy ---
+        # Gsubind Peers Average Calculation
+        peer_indices = gsubind_data[gsubind_data == gsubind].index
+        peer_tickers = ticker_data.loc[peer_indices]
+
+        peer_hit_rates = []
+
+        for peer_ticker in peer_tickers:
+            try:
+                actual_peer_price = actual_price_data.loc[peer_ticker]
+            except KeyError:
+                continue
+
+            peer_idx = ticker_data[ticker_data == peer_ticker].index[0]
+            peer_eps_row = eps_data.loc[peer_idx]
+            peer_median_pe_row = pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
+            peer_model_price = peer_eps_row * peer_median_pe_row
+
+            peer_price_df = pd.DataFrame({
+                'Year': years,
+                'Model Price': peer_model_price.values,
+                'Actual Price': actual_peer_price.values
+            })
+            peer_price_df['Prediction'] = np.where(peer_model_price > actual_peer_price, 'Up', 'Down')
+
+            peer_total_predictions = 0
+            peer_correct_predictions = 0
+
+            for year in range(2010, 2023):
+                if year not in peer_price_df['Year'].values or pd.isna(peer_price_df.loc[peer_price_df['Year'] == year, 'Prediction'].values[0]):
+                    continue
+
+                model_pred = peer_price_df.loc[peer_price_df['Year'] == year, 'Prediction'].values[0]
+
+                if (year+1 in actual_peer_price.index) and pd.notna(actual_peer_price.get(year+1)) and pd.notna(actual_peer_price.get(year)):
+                    actual_move_next = 'Up' if actual_peer_price[year+1] > actual_peer_price[year] else 'Down'
+                    if model_pred == actual_move_next:
+                        peer_correct_predictions += 1
+                    peer_total_predictions += 1
+
+                if (year+2 in actual_peer_price.index) and pd.notna(actual_peer_price.get(year+2)) and pd.notna(actual_peer_price.get(year)):
+                    actual_move_second = 'Up' if actual_peer_price[year+2] > actual_peer_price[year] else 'Down'
+                    if model_pred == actual_move_second:
+                        peer_correct_predictions += 1
+                    peer_total_predictions += 1
+
+            if peer_total_predictions > 0:
+                peer_hit_rate = (peer_correct_predictions / peer_total_predictions) * 100
+                peer_hit_rates.append(peer_hit_rate)
+
+        st.subheader("🏆 Gsubind Average Hit Rate Comparison")
+        if peer_hit_rates:
+            gsubind_avg_hit_rate = np.mean(peer_hit_rates)
+            st.markdown(f"**Your Stock Hit Rate:** {overall_hit_rate:.2f}%")
+            st.markdown(f"**Gsubind Average Hit Rate:** {gsubind_avg_hit_rate:.2f}%")
+            if overall_hit_rate >= gsubind_avg_hit_rate:
+                st.success("✅ Your stock is performing **at or above** gsubind average!")
+            else:
+                st.error("❌ Your stock is **underperforming** vs gsubind average.")
+        else:
+            st.warning("Could not calculate gsubind average hit rate (insufficient data).")
+
+        # Overall Model Accuracy Calculation
+        st.subheader("📈 Overall Model Accuracy Across All Stocks")
         all_hit_rates = []
 
         for ticker in ticker_data.dropna():
@@ -130,8 +194,8 @@ if ticker_input:
                 })
                 peer_price_df['Prediction'] = np.where(peer_model_price > peer_actual_price, 'Up', 'Down')
 
-                peer_total_preds = 0
-                peer_correct_preds = 0
+                peer_total_predictions = 0
+                peer_correct_predictions = 0
 
                 for year in range(2010, 2023):
                     if year not in peer_price_df['Year'].values or pd.isna(peer_price_df.loc[peer_price_df['Year'] == year, 'Prediction'].values[0]):
@@ -142,26 +206,25 @@ if ticker_input:
                     if (year+1 in peer_actual_price.index) and pd.notna(peer_actual_price.get(year+1)) and pd.notna(peer_actual_price.get(year)):
                         actual_move_next = 'Up' if peer_actual_price[year+1] > peer_actual_price[year] else 'Down'
                         if model_pred == actual_move_next:
-                            peer_correct_preds += 1
-                        peer_total_preds += 1
+                            peer_correct_predictions += 1
+                        peer_total_predictions += 1
 
                     if (year+2 in peer_actual_price.index) and pd.notna(peer_actual_price.get(year+2)) and pd.notna(peer_actual_price.get(year)):
                         actual_move_second = 'Up' if peer_actual_price[year+2] > peer_actual_price[year] else 'Down'
                         if model_pred == actual_move_second:
-                            peer_correct_preds += 1
-                        peer_total_preds += 1
+                            peer_correct_predictions += 1
+                        peer_total_predictions += 1
 
-                if peer_total_preds > 0:
-                    peer_hit_rate = (peer_correct_preds / peer_total_preds) * 100
+                if peer_total_predictions > 0:
+                    peer_hit_rate = (peer_correct_predictions / peer_total_predictions) * 100
                     all_hit_rates.append(peer_hit_rate)
 
             except:
                 continue
 
-        st.subheader("\ud83d\udcca Overall Model Accuracy Across All Stocks")
         if all_hit_rates:
             overall_model_accuracy = np.mean(all_hit_rates)
-            st.info(f"\ud83d\udd04 Overall Model Hit Rate Across Market: **{overall_model_accuracy:.2f}%**")
+            st.info(f"📈 Overall Model Hit Rate Across Market: **{overall_model_accuracy:.2f}%**")
         else:
             st.warning("Could not compute overall model accuracy.")
 
