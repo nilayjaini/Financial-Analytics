@@ -50,71 +50,62 @@ if ticker_input and ticker_input in ticker_data.values:
     sector = company_data.loc[idx, 'Industry'] if 'Industry' in company_data.columns else "N/A"
     industry = company_data.loc[idx, 'Industry'] if 'Industry' in company_data.columns else "N/A"
 
-    st.markdown(f"**Sector:** {sector}")
-    st.markdown(f"**Industry:** {industry}")
+    st.markdown(f"**Sector:** {sector}  ")
+    st.markdown(f"**Industry:** {industry}  ")
     st.markdown(f"**Peers:** {', '.join(peers)}")
 
-    # ---- BIG FIX: Replace 0 or negative EPS before calculating PE ----
+    # --- ✨ Correct cleaning starts here ---
     clean_eps_data = eps_data.copy()
     clean_eps_data[clean_eps_data <= 0] = np.nan
 
-    pe_ratio = price_data.divide(clean_eps_data)   # now clean
+    pe_ratio = price_data.divide(clean_eps_data)
     pe_ratio_with_gsubind = pe_ratio.copy()
     pe_ratio_with_gsubind['gsubind'] = gsubind_data.values
 
     peer_pe_ratios = pe_ratio_with_gsubind.loc[peer_indices]
+
     valid_peer_pe = peer_pe_ratios[2024].dropna()
+    valid_peer_pe = valid_peer_pe[(valid_peer_pe > 0) & (valid_peer_pe < 200)]  # Keep only reasonable P/Es
 
     industry_pe_avg = valid_peer_pe.median() if not valid_peer_pe.empty else np.nan
 
-    # ---- Now fetch THIS stock EPS ----
-    eps = eps_data.loc[idx, 2024]
-    if eps <= 0:
-        eps = np.nan
-
+    # Valuation
+    eps = clean_eps_data.loc[idx, 2024]
     current_price = price_data.loc[idx, 2024]
-
-    if not np.isnan(eps) and not np.isnan(industry_pe_avg):
-        implied_price = eps * industry_pe_avg
-        implied_price_min = eps * valid_peer_pe.min()
-        implied_price_max = eps * valid_peer_pe.max()
-    else:
-        implied_price = implied_price_min = implied_price_max = np.nan
+    implied_price_avg = eps * industry_pe_avg if pd.notna(eps) and pd.notna(industry_pe_avg) else np.nan
+    implied_price_min = eps * valid_peer_pe.min() if pd.notna(eps) and not valid_peer_pe.empty else np.nan
+    implied_price_max = eps * valid_peer_pe.max() if pd.notna(eps) and not valid_peer_pe.empty else np.nan
 
     # Display Key Inputs
     st.subheader("📊 Key Valuation Inputs")
     col1, col2, col3 = st.columns(3)
-    col1.metric("EPS (2024)", f"{eps:.2f}" if not np.isnan(eps) else "N/A")
-    col2.metric("Industry Median P/E", f"{industry_pe_avg:.2f}" if not np.isnan(industry_pe_avg) else "N/A")
-    col3.metric("Current Price (2024)", f"${current_price:.2f}" if not np.isnan(current_price) else "N/A")
+    col1.metric("EPS (2024)", f"{eps:.2f}" if pd.notna(eps) else "N/A")
+    col2.metric("Industry Median P/E", f"{industry_pe_avg:.2f}" if pd.notna(industry_pe_avg) else "N/A")
+    col3.metric("Current Price (2024)", f"${current_price:.2f}" if pd.notna(current_price) else "N/A")
 
-    # Recommendation Logic
+    # Recommendation
     st.subheader("✅ Recommendation")
-    if not np.isnan(implied_price) and implied_price > current_price:
-        st.success("📈 Likely Undervalued — Consider Buying")
-    elif not np.isnan(implied_price) and implied_price <= current_price:
-        st.warning("📉 Likely Overvalued — Exercise Caution")
+    if pd.notna(implied_price_avg) and pd.notna(current_price):
+        if implied_price_avg > current_price:
+            st.success("📈 Likely Undervalued — Consider Buying")
+        else:
+            st.warning("📉 Likely Overvalued — Exercise Caution")
     else:
-        st.warning("⚠️ Not enough valid data to give a recommendation.")
+        st.info("❓ Not enough data to make a recommendation.")
 
-    # Visualization
+    # --- 📉 Visualization ---
     st.subheader("📉 Valuation Range Visualization")
 
-    if not valid_peer_pe.empty and not np.isnan(eps):
+    if pd.notna(implied_price_min) and pd.notna(implied_price_max) and pd.notna(implied_price_avg) and eps > 0:
         fig, ax = plt.subplots(figsize=(10, 2))
 
-        # Gray bar: implied price range
         ax.hlines(1, implied_price_min, implied_price_max, color='gray', linewidth=10, alpha=0.4)
 
-        # Blue line: avg implied price
-        ax.vlines(implied_price, 0.9, 1.1, color='blue', linewidth=2, label='Avg Implied Price')
-
-        # Red dot: current price
+        ax.vlines(implied_price_avg, 0.9, 1.1, color='blue', linewidth=2, label='Avg Implied Price')
         ax.plot(current_price, 1, 'ro', markersize=10, label='Current Price')
 
-        # Labels
         ax.text(implied_price_min, 1.15, f"Low: ${implied_price_min:.2f}", ha='left', fontsize=9)
-        ax.text(implied_price, 1.15, f"Avg: ${implied_price:.2f}", ha='center', fontsize=9, color='blue')
+        ax.text(implied_price_avg, 1.15, f"Avg: ${implied_price_avg:.2f}", ha='center', fontsize=9, color='blue')
         ax.text(implied_price_max, 1.15, f"High: ${implied_price_max:.2f}", ha='right', fontsize=9)
 
         ax.set_xlim([implied_price_min * 0.9, implied_price_max * 1.1])
@@ -124,8 +115,7 @@ if ticker_input and ticker_input in ticker_data.values:
 
         st.pyplot(fig)
 
-        # Caption
-        gap = ((implied_price - current_price) / implied_price) * 100
+        gap = ((implied_price_avg - current_price) / implied_price_avg) * 100
         if gap > 0:
             st.caption(f"📉 Current price is **{gap:.1f}% below** the implied valuation average.")
         else:
