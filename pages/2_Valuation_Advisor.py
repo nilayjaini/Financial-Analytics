@@ -54,8 +54,11 @@ if ticker_input and ticker_input in ticker_data.values:
     st.markdown(f"**Industry:** {industry}")
     st.markdown(f"**Peers:** {', '.join(peers)}")
 
-    # Calculate Median P/E for all peers
-    pe_ratio = price_data.divide(eps_data.replace({0: np.nan}))  # <-- Replace 0 EPS
+    # ---- BIG FIX: Replace 0 or negative EPS before calculating PE ----
+    clean_eps_data = eps_data.copy()
+    clean_eps_data[clean_eps_data <= 0] = np.nan
+
+    pe_ratio = price_data.divide(clean_eps_data)   # now clean
     pe_ratio_with_gsubind = pe_ratio.copy()
     pe_ratio_with_gsubind['gsubind'] = gsubind_data.values
 
@@ -64,10 +67,11 @@ if ticker_input and ticker_input in ticker_data.values:
 
     industry_pe_avg = valid_peer_pe.median() if not valid_peer_pe.empty else np.nan
 
-    # Valuation
+    # ---- Now fetch THIS stock EPS ----
     eps = eps_data.loc[idx, 2024]
     if eps <= 0:
-        eps = np.nan  # Treat 0 or negative EPS as NaN
+        eps = np.nan
+
     current_price = price_data.loc[idx, 2024]
 
     if not np.isnan(eps) and not np.isnan(industry_pe_avg):
@@ -120,7 +124,7 @@ if ticker_input and ticker_input in ticker_data.values:
 
         st.pyplot(fig)
 
-        # Caption on valuation gap
+        # Caption
         gap = ((implied_price - current_price) / implied_price) * 100
         if gap > 0:
             st.caption(f"📉 Current price is **{gap:.1f}% below** the implied valuation average.")
