@@ -74,7 +74,7 @@ if ticker_input:
         total_predictions = 0
         correct_predictions = 0
 
-        for year in range(2010, 2023):
+        for year in range(2010, 2024):
             if year not in price_df['Year'].values:
                 continue
 
@@ -135,7 +135,7 @@ if ticker_input:
                 peer_median_pe_row = pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
                 peer_model_price = peer_eps_row * peer_median_pe_row
 
-                for year in range(2010, 2023):
+                for year in range(2010, 2024):
                     if pd.isna(peer_model_price.get(year)):
                         continue
 
