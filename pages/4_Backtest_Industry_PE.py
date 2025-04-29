@@ -5,7 +5,6 @@ import numpy as np
 @st.cache_data
 def load_data():
     file_path = 'data/Master data price eps etc.xlsx'
-
     company_data = pd.read_excel(file_path, sheet_name='Company Dta', header=None)
     headers = company_data.iloc[3]
     company_data.columns = headers
@@ -32,6 +31,7 @@ def load_data():
 
     return company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data
 
+# Load data
 company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data = load_data()
 years = list(range(2010, 2025))
 
@@ -66,34 +66,31 @@ if ticker_input:
         price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
         price_df.set_index('Year', inplace=True)
 
-        # ✅ Correct and Final Hit Rate Calculation
+        # 🧹 Clean up NaN years
+        available_years = price_df.dropna(subset=['Actual Price', 'Prediction']).index
+
+        # ✅ Correct Full Hit Rate Calculation
         total_predictions = 0
         correct_predictions = 0
 
-        for base_year in range(2010, 2023):  # 2010 to 2022 (to allow t+1 and t+2 check)
-            if base_year not in price_df.index:
-                continue
+        for base_year in available_years:
+            if base_year > 2021:
+                continue  # Don't check for year+2 if base year too close to 2024
 
-            base_prediction = price_df.loc[base_year, 'Prediction']
-            base_actual_price = actual_price.get(base_year)
+            pred = price_df.loc[base_year, 'Prediction']
+            base_price = actual_price.get(base_year)
+            next_price = actual_price.get(base_year + 1)
+            next2_price = actual_price.get(base_year + 2)
 
-            # check base year exists
-            if pd.isna(base_actual_price):
-                continue
-
-            # 1-year ahead (t+1)
-            next_year = base_year + 1
-            if next_year in actual_price.index and pd.notna(actual_price.get(next_year)):
-                move = 'Up' if actual_price[next_year] > base_actual_price else 'Down'
-                if move == base_prediction:
+            if pd.notna(base_price) and pd.notna(next_price):
+                move = 'Up' if next_price > base_price else 'Down'
+                if move == pred:
                     correct_predictions += 1
                 total_predictions += 1
 
-            # 2-year ahead (t+2)
-            second_year = base_year + 2
-            if second_year in actual_price.index and pd.notna(actual_price.get(second_year)):
-                move = 'Up' if actual_price[second_year] > base_actual_price else 'Down'
-                if move == base_prediction:
+            if pd.notna(base_price) and pd.notna(next2_price):
+                move = 'Up' if next2_price > base_price else 'Down'
+                if move == pred:
                     correct_predictions += 1
                 total_predictions += 1
 
