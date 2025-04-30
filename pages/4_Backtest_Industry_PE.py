@@ -64,20 +64,19 @@ if ticker_input:
             st.error(f"Ticker '{ticker_input}' not found in 'Analysis' actual price data.")
             st.stop()
 
-        # ✅ Get current market price from yfinance
+        # ✅ FIXED: More robust current price fetching with fallback
         try:
             ticker_obj = yf.Ticker(ticker_input)
             info = ticker_obj.info
             current_price = info.get("regularMarketPrice")
 
-            # Fallback to 1-day close if regularMarketPrice is not available
             if current_price is None:
-                current_price_info = ticker_obj.history(period="1d")
-                current_price = current_price_info['Close'].iloc[-1] if not current_price_info.empty else None
+                hist = ticker_obj.history(period="1d")
+                current_price = hist["Close"].iloc[-1] if not hist.empty else None
 
-        except Exception as e:
+        except Exception:
             current_price = None
-            st.error(f"⚠️ Error fetching current price from yfinance: {e}")
+            st.warning("⚠️ Could not fetch live price from Yahoo Finance (rate-limited or invalid ticker).")
 
         st.subheader("📈 Price Comparison for 2024")
         col1, col2, col3 = st.columns(3)
@@ -97,6 +96,5 @@ if ticker_input:
         else:
             col3.metric("Current Stock Price", "N/A")
 
-        # (Optional: Continue with hit-rate and other analytics logic...)
     else:
         st.error(f"❌ Ticker '{ticker_input}' not found in uploaded data.")
