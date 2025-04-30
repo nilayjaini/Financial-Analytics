@@ -3,8 +3,9 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 
-# 📅 Load Data
+# 📥 Load Data
 @st.cache_data
+
 def load_data():
     file_path = 'data/Master data price eps etc.xlsx'
 
@@ -39,7 +40,7 @@ company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median
 years = list(range(2010, 2025))
 
 # 📊 Streamlit App
-st.title(":bar_chart: Company Stock Valuation Analysis")
+st.title("📊 Company Stock Valuation Analysis")
 ticker_input = st.text_input("Enter Ticker (e.g., AAPL, DELL, TSLA)").upper()
 
 if ticker_input:
@@ -48,7 +49,7 @@ if ticker_input:
 
         st.subheader(f"Details for: {ticker_input}")
         gsubind = gsubind_data[idx]
-        st.write("**gsubind:**", f"🌍 {gsubind}")
+        st.write("**gsubind:**", f"🧭 {gsubind}")
 
         eps_row = eps_data.loc[idx]
         eps_row = eps_row.mask(eps_row <= 0)
@@ -62,25 +63,33 @@ if ticker_input:
             st.error(f"Ticker '{ticker_input}' not found in 'Analysis' actual price data.")
             st.stop()
 
-        # Fetch current price with fallback
         try:
             ticker_obj = yf.Ticker(ticker_input)
-            current_price = ticker_obj.fast_info.get('last_price', None)
-            if current_price is None:
-                hist = ticker_obj.history(period="1d")
-                if not hist.empty:
-                    current_price = hist['Close'].iloc[-1]
-        except Exception:
+            current_price_info = ticker_obj.history(period="1d")
+            if not current_price_info.empty:
+                current_price = current_price_info['Close'].iloc[-1]
+            else:
+                current_price = None
+        except Exception as e:
             current_price = None
+            st.error(f"Error fetching current price: {e}")
 
-        # Show model, actual and live prices
-        st.subheader(":chart_with_upwards_trend: Price Comparison for 2024")
+        st.subheader("📈 Price Comparison for 2024")
         col1, col2, col3 = st.columns(3)
-        col1.metric("Model Price (2024)", f"${model_price.get(2024):.2f}" if not pd.isna(model_price.get(2024)) else "N/A")
-        col2.metric("Actual Price (2024)", f"${actual_price.get(2024):.2f}" if not pd.isna(actual_price.get(2024)) else "N/A")
-        col3.metric("Current Stock Price", f"${current_price:.2f}" if current_price else "N/A")
 
-        # (Other analytics and tables would follow here, such as hit rate, gsubind comparison, etc.)
+        if not pd.isna(model_price.get(2024)):
+            col1.metric("Model Price (2024)", f"${model_price[2024]:.2f}")
+        else:
+            col1.metric("Model Price (2024)", "N/A")
 
-    else:
-        st.warning("Ticker not found. Please check again.")
+        if not pd.isna(actual_price.get(2024)):
+            col2.metric("Actual Price (2024)", f"${actual_price[2024]:.2f}")
+        else:
+            col2.metric("Actual Price (2024)", "N/A")
+
+        if current_price is not None:
+            col3.metric("Current Stock Price", f"${current_price:.2f}")
+        else:
+            col3.metric("Current Stock Price", "N/A")
+
+        # (Keep rest of original logic for hit rates, gsubind accuracy, model evaluation, etc.)
