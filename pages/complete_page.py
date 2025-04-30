@@ -330,8 +330,13 @@ with tab2:
             median_pe_array = gsubind_to_median_pe.get(gsubind_data[idx], [None] * len(years))
             median_pe_2024 = None
             if median_pe_array is not None and len(median_pe_array) > 2024:
-                median_pe_2024 = median_pe_array[2024]            
-            model_price_2024 = eps_2024 * median_pe_2024 if eps_2024 and median_pe_2024 else None
+                median_pe_2024 = median_pe_array[2024]
+            st.write("EPS 2024:", eps_2024)
+            st.write("Median P/E Array:", median_pe_array)
+            st.write("Median P/E 2024:", median_pe_2024)
+            model_price_2024 = None
+            if eps_2024 is not None and median_pe_2024 is not None:
+                model_price_2024 = float(eps_2024) * float(median_pe_2024)            
             actual_price_2024 = actual_price_data.loc[ticker_input, 2024] if 2024 in actual_price_data.columns else None
             current_price = info.get("regularMarketPrice", "Not fetched")
 
