@@ -179,7 +179,9 @@ with tab1:
         eps_valid = (eps_2024 > 0) and not np.isnan(eps_2024)
 
         if eps_valid and not valid_peer_pe.empty:
-            industry_pe_avg = valid_peer_pe.median()
+            # industry_pe_avg = valid_peer_pe.median()
+            pe_2024_array = gsubind_to_median_pe.get(company_gsubind, [np.nan] * len(years))
+            industry_pe_avg = pe_2024_array[-1]
             implied_price_avg = eps_2024 * industry_pe_avg
             implied_price_min = eps_2024 * valid_peer_pe.min()
             implied_price_max = eps_2024 * valid_peer_pe.max()
@@ -191,7 +193,7 @@ with tab1:
         c1, c2, c3 = st.columns(3)
         c1.metric("Last Reported EPS", f"{eps_2024:.2f}" if eps_valid else "N/A")
         c2.metric(
-            "Industry Median P/E",
+            "2024 Median P/E",
             f"{industry_pe_avg:.2f}" if not np.isnan(industry_pe_avg) else "N/A",
         )
         c3.metric(
