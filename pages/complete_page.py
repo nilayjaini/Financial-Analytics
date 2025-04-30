@@ -327,21 +327,25 @@ with tab2:
         try:
     # Get relevant price data
             eps_2024 = eps_data.loc[idx, 2024] if 2024 in eps_data.columns else None
-            median_pe_array = gsubind_to_median_pe.get(gsubind_data[idx], [] )
+            # Fetch the last value from the Median P/E Array safely
+            median_pe_array = gsubind_to_median_pe.get(gsubind_data[idx], [])
             median_pe_2024 = None
             if median_pe_array is not None and len(median_pe_array) > 0 and not np.all(np.isnan(median_pe_array)):
-                median_pe_2024 = median_pe_array[-1]            
-                # if median_pe_array is not None and len(median_pe_array) > 2024:
-            #     median_pe_2024 = median_pe_array[2024]
+                median_pe_2024 = median_pe_array[-1]
+
+    # Debug: Check values
             st.write("EPS 2024:", eps_2024)
             st.write("Median P/E Array:", median_pe_array)
-            st.write("Median P/E 2024:", median_pe_2024)
+            st.write("Last Median P/E Value:", median_pe_2024)
+
+    # Calculate model price
             model_price_2024 = None
             if eps_2024 is not None and median_pe_2024 is not None:
-                model_price_2024 = float(eps_2024) * float(median_pe_2024)            
+                model_price_2024 = float(eps_2024) * float(median_pe_2024)
+
+    # Fetch actual price and current price
             actual_price_2024 = actual_price_data.loc[ticker_input, 2024] if 2024 in actual_price_data.columns else None
             current_price = info.get("regularMarketPrice", "Not fetched")
-
             # Display metrics
             st.subheader("📊 Key Valuation Inputs")
             c1, c2, c3 = st.columns(3)
