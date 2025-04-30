@@ -608,7 +608,7 @@ with tab3:
     st.title("🏢 Company Snapshot")
 
     if ticker_input in ticker_data.values:
-        ticker = yf.Ticker(ticker_input.upper())
+        # ticker = yf.Ticker(ticker_input.upper())
         try:
             ticker = yf.Ticker(ticker_input.upper())
             info = ticker.info
@@ -627,12 +627,15 @@ with tab3:
             info = {}
             logo_url = None
 
-            col1, col2 = st.columns([1, 10])
-            with col1:
-                if logo_url:
-                    st.image(logo_url, width=50)
-            with col2:
-                st.subheader(f"{company_name} ({ticker_input.upper()})")
+        col1, col2 = st.columns([1, 10])
+        with col1:
+            if logo_url:
+                st.image(logo_url, width=50)
+        with col2:
+            st.subheader(f"{company_name} ({ticker_input.upper()})")
+        st.markdown(f"**Website:** {website or 'Not fetched'}")
+        st.markdown(f"📅 **Next Earnings Date:** {info.get('earningsDate', ['N/A'])[0]}")
+
             with st.container():
                 st.subheader("📊 Key Valuation Inputs")
                 c1, c2, c3 = st.columns(3)
