@@ -349,8 +349,8 @@ with tab2:
             # Display metrics
             st.subheader("📊 Key Valuation Inputs")
             c1, c2, c3 = st.columns(3)
-            c1.metric("Model Price 2024", f"${model_price_2024:.2f}" if model_price_2024 else "N/A")
-            c2.metric("Actual Price 2024", f"${actual_price_2024:.2f}" if actual_price_2024 else "N/A")
+            c1.metric("Actual Price 2024", f"${actual_price_2024:.2f}" if actual_price_2024 else "N/A")
+            c2.metric("Model Price 2025", f"${model_price_2024:.2f}" if model_price_2024 else "N/A")
             c3.metric("Current Price", f"${current_price:.2f}" if isinstance(current_price, (int, float)) else "N/A")
         except Exception as e:
             st.error("⚠️ Could not calculate key valuation inputs.")
