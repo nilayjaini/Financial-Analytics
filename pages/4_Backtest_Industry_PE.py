@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -38,150 +37,67 @@ def load_data():
 # 🚀 Load
 company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data = load_data()
 years = list(range(2010, 2025))
-current_price = price_data.loc[idx, 2024]
-        try:
-            current_price = info.get("regularMarketPrice")
-            if current_price is None:
-                hist = ticker_obj.history(period="1d")
-                current_price = hist["Close"][-1] if not hist.empty else np.nan
-        except Exception:
-            current_price = np.nan
 
 # 📊 Streamlit App
 st.title("📊 Company Stock Valuation Analysis")
 ticker_input = st.text_input("Enter Ticker (e.g., AAPL, DELL, TSLA)").upper()
 
-if ticker_input:
-    if ticker_input in ticker_data.values:
-        idx = ticker_data[ticker_data == ticker_input].index[0]
+if ticker_input and ticker_input in ticker_data.values:
+    idx = ticker_data[ticker_data == ticker_input].index[0]
+    gsubind = gsubind_data[idx]
 
-        st.subheader(f"Details for: {ticker_input}")
-        st.subheader("📊 Key Valuation Inputs")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Last Reported Model Price", f"{model_price_2024:.2f}" if eps_valid else "N/A")
-        c2.metric(
-            "Actual Price",
-            f"{actual_price:.2f}" if not np.isnan(industry_pe_avg) else "N/A",
-        )
-        c3.metric(
-            "Current Price",
-            f"${current_price:.2f}" if not np.isnan(current_price) else "N/A",
-        )
+    eps_row = eps_data.loc[idx].mask(eps_data.loc[idx] <= 0)
+    median_pe_row = pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
+    model_price = eps_row * median_pe_row
 
-        gsubind = gsubind_data[idx]
-        st.write("**gsubind:**", f"🧭 {gsubind}")
+    try:
+        actual_price = actual_price_data.loc[ticker_input]
+    except KeyError:
+        st.error(f"Ticker '{ticker_input}' not found in 'Analysis' actual price data.")
+        st.stop()
 
-        eps_row = eps_data.loc[idx]
-        eps_row = eps_row.mask(eps_row <= 0)  # Replace 0 and negatives with NaN
+    try:
+        ticker_obj = yf.Ticker(ticker_input)
+        current_price_info = ticker_obj.history(period="1d")
+        current_price = current_price_info['Close'].iloc[-1] if not current_price_info.empty else None
+    except Exception as e:
+        current_price = None
+        st.error(f"Error fetching current price: {e}")
 
-        median_pe_row = pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
-        model_price = eps_row * median_pe_row
+    # 📈 Price Comparison
+    st.subheader("📈 Price Comparison for 2024")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Model Price (2024)", f"${model_price[2024]:.2f}" if not pd.isna(model_price[2024]) else "N/A")
+    col2.metric("Actual Price (2024)", f"${actual_price[2024]:.2f}" if not pd.isna(actual_price[2024]) else "N/A")
+    col3.metric("Current Market Price", f"${current_price:.2f}" if current_price else "N/A")
 
-        try:
-            actual_price = actual_price_data.loc[ticker_input]
-        except KeyError:
-            st.error(f"Ticker '{ticker_input}' not found in 'Analysis' actual price data.")
-            st.stop()
+    # ⏳ Prepare Table
+    price_df = pd.DataFrame({
+        'Year': years,
+        'EPS': eps_row.values,
+        'Median PE': median_pe_row.values,
+        'Model Price': model_price.values,
+        'Actual Price': actual_price.values
+    })
+    price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
+    st.dataframe(price_df, use_container_width=True)
 
-        try:
-            ticker_obj = yf.Ticker(ticker_input)
-            current_price_info = ticker_obj.history(period="1d")
-            current_price = current_price_info['Close'].iloc[-1] if not current_price_info.empty else None
-        except Exception as e:
-            current_price = None
-            st.error(f"Error fetching current price: {e}")
+    # 🎯 Hit Rate
+    total, correct = 0, 0
+    for y in range(2010, 2024):
+        if pd.isna(model_price.get(y)): continue
+        pred = 'Up' if model_price[y] > actual_price[y] else 'Down'
+        for offset in [1, 2]:
+            if pd.notna(actual_price.get(y + offset)):
+                move = 'Up' if actual_price[y + offset] > actual_price[y] else 'Down'
+                correct += int(pred == move)
+                total += 1
+    hit_rate = correct / total * 100 if total else np.nan
+    st.subheader("🎯 Overall Prediction Hit Rate Analysis")
+    st.markdown(f"**Total Valid Predictions:** {total}")
+    st.markdown(f"**Correct Predictions:** {correct}")
+    st.success(f"✅ Hit Rate: **{hit_rate:.2f}%**") if not np.isnan(hit_rate) else st.warning("Not enough data.")
 
-        # 📈 Price Comparison for 2024
-        st.subheader("📈 Price Comparison for 2024")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Model Price (2024)", f"${model_price[2024]:.2f}" if not pd.isna(model_price.get(2024)) else "N/A")
-        col2.metric("Actual Price (2024)", f"${actual_price[2024]:.2f}" if not pd.isna(actual_price.get(2024)) else "N/A")
-        col3.metric("Current Market Price", f"${current_price:.2f}" if current_price is not None else "N/A")
-
-        price_df = pd.DataFrame({
-            'Year': years,
-            'EPS': eps_row.values,
-            'Median PE': median_pe_row.values,
-            'Model Price': model_price.values,
-            'Actual Price': actual_price.values
-        })
-        price_df['Prediction'] = np.where(model_price > actual_price, 'Up', 'Down')
-
-        # 🎯 Hit Rate Calculation
-        total_predictions = 0
-        correct_predictions = 0
-        for year in range(2010, 2024):
-            if pd.isna(model_price.get(year)):
-                continue
-            model_pred = 'Up' if model_price[year] > actual_price[year] else 'Down'
-            if pd.notna(actual_price.get(year+1)):
-                correct_predictions += int(model_pred == ('Up' if actual_price[year+1] > actual_price[year] else 'Down'))
-                total_predictions += 1
-            if pd.notna(actual_price.get(year+2)):
-                correct_predictions += int(model_pred == ('Up' if actual_price[year+2] > actual_price[year] else 'Down'))
-                total_predictions += 1
-
-        overall_hit_rate = (correct_predictions / total_predictions * 100) if total_predictions else np.nan
-        st.subheader("🎯 Overall Prediction Hit Rate Analysis")
-        st.markdown(f"**Total Valid Predictions:** {total_predictions}")
-        st.markdown(f"**Correct Predictions:** {correct_predictions}")
-        st.success(f"✅ Overall Average Hit Rate: **{overall_hit_rate:.2f}%**") if not np.isnan(overall_hit_rate) else st.warning("Not enough data to calculate hit rate.")
-        st.dataframe(price_df, use_container_width=True)
-
-        # 🔮 Final Prediction for 2024
-        price_df.set_index('Year', inplace=True)
-        if 2024 in price_df.index and not pd.isna(price_df.loc[2024, 'Prediction']):
-            st.success(f"🔮 Final Prediction for 2024: {price_df.loc[2024, 'Prediction']}")
-        else:
-            st.warning("Prediction for 2024 not available.")
-
-        # 🏆 Gsubind Average Accuracy
-        peer_indices = gsubind_data[gsubind_data == gsubind].index
-        gsubind_total = 0
-        gsubind_correct = 0
-        for peer_idx in peer_indices:
-            peer_ticker = ticker_data[peer_idx]
-            if peer_ticker not in actual_price_data.index: continue
-            peer_eps = eps_data.loc[peer_idx].mask(eps_data.loc[peer_idx] <= 0)
-            peer_actual = actual_price_data.loc[peer_ticker]
-            peer_model = peer_eps * pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
-            for year in range(2010, 2024):
-                if pd.isna(peer_model.get(year)): continue
-                pred = 'Up' if peer_model[year] > peer_actual[year] else 'Down'
-                if pd.notna(peer_actual.get(year+1)):
-                    gsubind_correct += int(pred == ('Up' if peer_actual[year+1] > peer_actual[year] else 'Down'))
-                    gsubind_total += 1
-                if pd.notna(peer_actual.get(year+2)):
-                    gsubind_correct += int(pred == ('Up' if peer_actual[year+2] > peer_actual[year] else 'Down'))
-                    gsubind_total += 1
-
-        gsubind_hit = (gsubind_correct / gsubind_total * 100) if gsubind_total else np.nan
-        st.subheader("🏆 Gsubind Average Hit Rate Comparison")
-        st.markdown(f"**Your Stock Hit Rate:** {overall_hit_rate:.2f}%")
-        st.success(f"🏆 Gsubind Average Hit Rate: **{gsubind_hit:.2f}%**") if not np.isnan(gsubind_hit) else st.warning("Not enough data for gsubind hit rate.")
-
-        # 🌍 Global Model Accuracy
-        global_total = 0
-        global_correct = 0
-        for i in range(len(ticker_data)):
-            peer = ticker_data[i]
-            if peer not in actual_price_data.index: continue
-            eps_peer = eps_data.loc[i].mask(eps_data.loc[i] <= 0)
-            act_peer = actual_price_data.loc[peer]
-            pe_row = pd.Series(gsubind_to_median_pe.get(gsubind_data[i], [None]*len(years)), index=years)
-            model_peer = eps_peer * pe_row
-            for year in range(2010, 2024):
-                if pd.isna(model_peer.get(year)): continue
-                pred = 'Up' if model_peer[year] > act_peer[year] else 'Down'
-                if pd.notna(act_peer.get(year+1)):
-                    global_correct += int(pred == ('Up' if act_peer[year+1] > act_peer[year] else 'Down'))
-                    global_total += 1
-                if pd.notna(act_peer.get(year+2)):
-                    global_correct += int(pred == ('Up' if act_peer[year+2] > act_peer[year] else 'Down'))
-                    global_total += 1
-
-        global_hit = (global_correct / global_total * 100) if global_total else np.nan
-        st.subheader("🌍 Overall Model Accuracy (All Stocks)")
-        st.success(f"🌟 Global Model Accuracy: **{global_hit:.2f}%**") if not np.isnan(global_hit) else st.warning("Not enough data for global model accuracy.")
-    else:
-        st.warning("Ticker not found. Please check again.")
+else:
+    if ticker_input:
+        st.error("❌ Ticker not found. Please check and try again.")
