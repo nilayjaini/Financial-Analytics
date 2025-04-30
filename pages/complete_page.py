@@ -326,13 +326,11 @@ with tab2:
             st.subheader(f"Details for: {ticker_input}")
         try:
     # Get relevant price data
-            eps_2024 = eps_data.loc[idx, 2024]
-            # Fetch median P/E for 2024 with validation
-            median_pe = gsubind_to_median_pe.get(gsubind_data[idx], [None] * len(years))
-            median_pe_2024 = median_pe[2024] if len(median_pe) > 2024 and median_pe[2024] else None
-
-            model_price_2024 = eps_2024 * median_pe_2024 if median_pe_2024 and eps_2024 > 0 else None
-            actual_price_2024 = actual_price_data.loc[ticker_input, 2024]
+            eps_2024 = eps_data.loc[idx, 2024] if 2024 in eps_data.columns else None
+            median_pe_array = gsubind_to_median_pe.get(gsubind_data[idx], [None] * len(years))
+            median_pe_2024 = median_pe_array[2024] if median_pe_array and len(median_pe_array) > 2024 else None
+            model_price_2024 = eps_2024 * median_pe_2024 if eps_2024 and median_pe_2024 else None
+            actual_price_2024 = actual_price_data.loc[ticker_input, 2024] if 2024 in actual_price_data.columns else None
             current_price = info.get("regularMarketPrice", "Not fetched")
 
             # Display metrics
