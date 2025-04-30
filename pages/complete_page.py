@@ -336,11 +336,6 @@ with tab2:
                     median_pe_2024 = median_pe_array[-1]
                 
 
-    # Debug: Check values
-            st.write("EPS 2024:", eps_2024)
-            st.write("Median P/E Array:", median_pe_array)
-            st.write("Last Median P/E Value:", median_pe_2024)
-
     # Calculate model price
             model_price_2024 = None
             if eps_2024 is not None and median_pe_2024 is not None:
