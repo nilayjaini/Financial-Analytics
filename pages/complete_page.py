@@ -140,7 +140,7 @@ with tab1:
         #     f"https://logo.clearbit.com/{domain}" if domain else None
         # )
 
-        # col1, col2 = st.columns([1, 6])
+        col1, col2 = st.columns([1, 6])
         with col1:
             if logo_url:
                 st.image(logo_url, width=50)
