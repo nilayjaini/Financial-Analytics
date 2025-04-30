@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import yfinance as yf
 import plotly.graph_objects as go
 import urllib.parse
+from yfinance.exceptions import YFRateLimitError
+
 
 # ─── Page config ─────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Valuation & Backtest & Snapshot", layout="wide")
