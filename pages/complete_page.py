@@ -294,13 +294,29 @@ with tab2:
         industry = company_data.loc[idx, "Industry"]
 
         # ── Logo & header ────────────────────────────────────────────
-        ticker_obj = yf.Ticker(ticker_input.upper())
-        info = ticker_obj.info
-        website = info.get("website", "")
-        domain = urllib.parse.urlparse(website).netloc
-        logo_url = info.get("logo_url") or (
-            f"https://logo.clearbit.com/{domain}" if domain else None
-        )
+        try:
+            ticker_obj = yf.Ticker(ticker_input.upper())
+            info = ticker_obj.info
+            website = info.get("website", "")
+            domain = urllib.parse.urlparse(website).netloc
+            logo_url = info.get("logo_url") or (
+                f"https://logo.clearbit.com/{domain}" if domain else None
+            )
+        except YFRateLimitError:
+            st.error("⚠️ Unable to fetch data from Yahoo Finance due to rate limits. Please try again later.")
+            info = {}
+            logo_url = None
+        except Exception as e:
+            st.error(f"⚠️ An unexpected error occurred: {str(e)}")
+            info = {}
+            logo_url = None
+        # ticker_obj = yf.Ticker(ticker_input.upper())
+        # info = ticker_obj.info
+        # website = info.get("website", "")
+        # domain = urllib.parse.urlparse(website).netloc
+        # logo_url = info.get("logo_url") or (
+        #     f"https://logo.clearbit.com/{domain}" if domain else None
+        # )
 
         col1, col2 = st.columns([1, 6])
         with col1:
@@ -594,6 +610,7 @@ with tab3:
     if ticker_input in ticker_data.values:
         ticker = yf.Ticker(ticker_input.upper())
         try:
+            ticker = yf.Ticker(ticker_input.upper())
             info = ticker.info
             company_name = info.get("longName", ticker_input.upper())
             website = info.get("website", "")
@@ -601,6 +618,14 @@ with tab3:
             logo_url = info.get("logo_url") or (
                 f"https://logo.clearbit.com/{domain}" if domain else None
             )
+        except YFRateLimitError:
+            st.error("⚠️ Unable to fetch company data due to rate limits. Please try again later.")
+            info = {}
+            logo_url = None
+        except Exception as e:
+            st.error(f"⚠️ An unexpected error occurred: {str(e)}")
+            info = {}
+            logo_url = None
 
             col1, col2 = st.columns([1, 10])
             with col1:
