@@ -324,6 +324,23 @@ with tab2:
                 st.image(logo_url, width=50)
         with col2:
             st.subheader(f"Details for: {ticker_input}")
+        try:
+    # Get relevant price data
+            eps_2024 = eps_data.loc[idx, 2024]
+            median_pe = gsubind_to_median_pe.get(gsubind_data[idx], [None] * len(years))[2024]
+            model_price_2024 = eps_2024 * median_pe if median_pe and eps_2024 > 0 else None
+            actual_price_2024 = actual_price_data.loc[ticker_input, 2024]
+            current_price = info.get("regularMarketPrice", "Not fetched")
+            # Display metrics
+            st.subheader("📊 Key Valuation Inputs")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Model Price 2024", f"${model_price_2024:.2f}" if model_price_2024 else "N/A")
+            c2.metric("Actual Price 2024", f"${actual_price_2024:.2f}" if actual_price_2024 else "N/A")
+            c3.metric("Current Price", f"${current_price:.2f}" if isinstance(current_price, (int, float)) else "N/A")
+        except Exception as e:
+            st.error("⚠️ Could not calculate key valuation inputs.")
+            st.exception(e)
+            
 
         st.write(f"**Industry:** {industry}")
 
