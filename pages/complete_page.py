@@ -608,7 +608,6 @@ with tab3:
     st.title("🏢 Company Snapshot")
 
     if ticker_input in ticker_data.values:
-        # ticker = yf.Ticker(ticker_input.upper())
         try:
             ticker = yf.Ticker(ticker_input.upper())
             info = ticker.info
@@ -622,42 +621,29 @@ with tab3:
             st.error("⚠️ Unable to fetch company data due to rate limits. Please try again later.")
             info = {}
             logo_url = None
+            company_name = ticker_input.upper()
+            website = "Not fetched"
         except Exception as e:
             st.error(f"⚠️ An unexpected error occurred: {str(e)}")
             info = {}
             logo_url = None
-            col1, col2 = st.columns([1, 10])
-             with col1:
-                 if logo_url:
-                     st.image(logo_url, width=50)
-             with col2:
-                 st.subheader(f"{company_name} ({ticker_input.upper()})")
-             with st.container():
-                 st.subheader("📊 Key Valuation Inputs")
-                 c1, c2, c3 = st.columns(3)
-                 c1.metric("Model Price 2024", f"{model_price_2024:.2f}")
-                 c2.metric(
-                     "Actual Price",
-                     f"{actual_price_2024:.2f}" if not np.isnan(industry_pe_avg) else "N/A",
-                 )
-                 c3.metric(
-                     "Current Price",
-                     f"${current_price:.2f}" if not np.isnan(current_price) else "N/A",
-                 )
-        # st.subheader("📊 Key Valuation Inputs")
-        # c1, c2, c3 = st.columns(3)
-        # c1.metric("Model Price 2024", f"{model_price_2024:.2f}")
-        # c2.metric(
-        #     "Actual Price",
-        #     f"{actual_price_2024:.2f}" if not np.isnan(industry_pe_avg) else "N/A",
-        # )
-        # c3.metric(
-        #     "Current Price",
-        #     f"${current_price:.2f}" if not np.isnan(current_price) else "N/A",
-        # )
+            company_name = ticker_input.upper()
+            website = "Not fetched"
 
+        # Display company logo and name
+        col1, col2 = st.columns([1, 10])
+        with col1:
+            if logo_url:
+                st.image(logo_url, width=50)
+        with col2:
+            st.subheader(f"{company_name} ({ticker_input.upper()})")
 
-            # ── Price chart range selector ───────────────────────────
+        # Display website and earnings date
+        st.markdown(f"**Website:** {website or 'Not fetched'}")
+        st.markdown(f"📅 **Next Earnings Date:** {info.get('earningsDate', ['N/A'])[0]}")
+
+        # Handle stock price chart
+        try:
             interval_map = {
                 "1 Day": "1d",
                 "5 Days": "5d",
@@ -672,16 +658,22 @@ with tab3:
                 "📈 Select Time Range", list(interval_map.keys()), index=0
             )
             selected_interval = interval_map[interval_label]
+
+            # Fetch historical price data
             hist = (
                 ticker.history(period="1d", interval="5m")
                 if selected_interval == "1d"
                 else ticker.history(period=selected_interval)
             )
 
+            # Plot stock price chart
             fig_snap = go.Figure()
             fig_snap.add_trace(
                 go.Scatter(
-                    x=hist.index, y=hist["Close"], mode="lines", name="Close Price"
+                    x=hist.index,
+                    y=hist["Close"],
+                    mode="lines",
+                    name="Close Price"
                 )
             )
             fig_snap.update_layout(
@@ -691,19 +683,19 @@ with tab3:
                 yaxis_title="Price ($)",
             )
             st.plotly_chart(fig_snap, use_container_width=True)
+        except Exception as e:
+            st.error("⚠️ Could not load stock price data.")
+            st.exception(e)
 
-            # ── Key metrics grid ────────────────────────────────────
+        # Display key metrics
+        try:
             st.markdown("### 🧾 Key Metrics")
 
             def safe_fmt(val, pct=False):
                 if val is None or val == "N/A":
                     return "N/A"
                 return (
-                    f"{val*100:.2f}%"
-                    if pct
-                    else f"${val:.2f}"
-                    if isinstance(val, (int, float))
-                    else val
+                    f"{val*100:.2f}%" if pct else f"${val:.2f}" if isinstance(val, (int, float)) else val
                 )
 
             grid_data = [
@@ -740,15 +732,17 @@ with tab3:
                 + "</div>"
             )
             st.markdown(html, unsafe_allow_html=True)
+        except Exception as e:
+            st.error("⚠️ Could not load key metrics.")
+            st.exception(e)
 
-            # ── Company overview ────────────────────────────────────
+        # Display company overview
+        try:
             st.markdown("### 🏢 Company Overview")
             st.info(info.get("longBusinessSummary", "No description available."))
-            st.markdown(f"📅 **Next Earnings Date**: {info.get('earningsDate', ['N/A'])[0]}")
-            st.caption("📌 Data powered by Yahoo Finance")
-
         except Exception as e:
-            st.error("Could not load company data.")
+            st.error("⚠️ Could not load company overview.")
             st.exception(e)
+
     else:
         st.error("❌ Ticker not found. Please check your selection.")
