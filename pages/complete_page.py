@@ -632,8 +632,6 @@ with tab3:
                      st.image(logo_url, width=50)
              with col2:
                  st.subheader(f"{company_name} ({ticker_input.upper()})")
-
-
             with st.container():
                 st.subheader("📊 Key Valuation Inputs")
                 c1, c2, c3 = st.columns(3)
