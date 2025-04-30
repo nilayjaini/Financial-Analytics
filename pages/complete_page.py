@@ -328,8 +328,10 @@ with tab2:
     # Get relevant price data
             eps_2024 = eps_data.loc[idx, 2024] if 2024 in eps_data.columns else None
             median_pe_array = gsubind_to_median_pe.get(gsubind_data[idx], [] )
-            median_pe_2024 = median_pe_array[-1] if median_pe_array else None
-            # if median_pe_array is not None and len(median_pe_array) > 2024:
+            median_pe_2024 = None
+            if median_pe_array is not None and len(median_pe_array) > 0 and not np.all(np.isnan(median_pe_array)):
+                median_pe_2024 = median_pe_array[-1]            
+                # if median_pe_array is not None and len(median_pe_array) > 2024:
             #     median_pe_2024 = median_pe_array[2024]
             st.write("EPS 2024:", eps_2024)
             st.write("Median P/E Array:", median_pe_array)
