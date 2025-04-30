@@ -1,6 +1,9 @@
+pip install streamlit pandas numpy yfinance openpyxl
+
 import streamlit as st
 import pandas as pd
 import numpy as np
+import yfinance as yf
 
 # 📥 Load Data
 @st.cache_data
@@ -60,6 +63,40 @@ if ticker_input:
         except KeyError:
             st.error(f"Ticker '{ticker_input}' not found in 'Analysis' actual price data.")
             st.stop()
+
+        # Fetch current stock price using yfinance
+        try:
+            ticker_obj = yf.Ticker(ticker_input)
+            current_price_info = ticker_obj.history(period="1d")
+            if not current_price_info.empty:
+                current_price = current_price_info['Close'].iloc[-1]
+            else:
+                current_price = None
+        except Exception as e:
+            current_price = None
+            st.error(f"Error fetching current price: {e}")
+
+        # Display Model Price, Actual Price, and Current Price
+        st.subheader("📈 Price Comparison for 2024")
+        col1, col2, col3 = st.columns(3)
+
+        # Model Price for 2024
+        if not pd.isna(model_price.get(2024)):
+            col1.metric("Model Price (2024)", f"${model_price[2024]:.2f}")
+        else:
+            col1.metric("Model Price (2024)", "N/A")
+
+        # Actual Price for 2024
+        if not pd.isna(actual_price.get(2024)):
+            col2.metric("Actual Price (2024)", f"${actual_price[2024]:.2f}")
+        else:
+            col2.metric("Actual Price (2024)", "N/A")
+
+        # Current Stock Price
+        if current_price is not None:
+            col3.metric("Current Stock Price", f"${current_price:.2f}")
+        else:
+            col3.metric("Current Stock Price", "N/A")
 
         price_df = pd.DataFrame({
             'Year': years,
@@ -181,42 +218,6 @@ if ticker_input:
 
             try:
                 peer_eps_row = eps_data.loc[peer_idx]
-                peer_eps_row = peer_eps_row.mask(peer_eps_row <= 0)
-                peer_actual_price = actual_price_data.loc[peer_ticker]
-                peer_median_pe_row = pd.Series(gsubind_to_median_pe.get(peer_gsubind, [None]*len(years)), index=years)
-                peer_model_price = peer_eps_row * peer_median_pe_row
-
-                for year in range(2010, 2025):
-                    if pd.isna(peer_model_price.get(year)):
-                        continue
-
-                    peer_model_pred = 'Up' if peer_model_price[year] > peer_actual_price[year] else 'Down'
-
-                    if (year+1 in peer_actual_price.index) and pd.notna(peer_actual_price.get(year+1)):
-                        actual_next = 'Up' if peer_actual_price[year+1] > peer_actual_price[year] else 'Down'
-                        if peer_model_pred == actual_next:
-                            global_correct += 1
-                        global_total += 1
-
-                    if (year+2 in peer_actual_price.index) and pd.notna(peer_actual_price.get(year+2)):
-                        actual_second = 'Up' if peer_actual_price[year+2] > peer_actual_price[year] else 'Down'
-                        if peer_model_pred == actual_second:
-                            global_correct += 1
-                        global_total += 1
-
-            except:
-                continue
-
-        if global_total > 0:
-            global_hit_rate = (global_correct / global_total) * 100
-        else:
-            global_hit_rate = np.nan
-
-        st.subheader("🌍 Overall Model Accuracy (All Stocks)")
-        if not np.isnan(global_hit_rate):
-            st.success(f"🌟 Global Model Accuracy: **{global_hit_rate:.2f}%**")
-        else:
-            st.warning("Not enough data for global model accuracy.")
-
-    else:
-        st.warning("Ticker not found. Please check again.")
+                peer_eps_row = peer_eps_row
+::contentReference[oaicite:0]{index=0}
+ 
