@@ -38,6 +38,14 @@ def load_data():
 # 🚀 Load
 company_data, eps_data, price_data, ticker_data, gsubind_data, gsubind_to_median_pe, actual_price_data = load_data()
 years = list(range(2010, 2025))
+current_price = price_data.loc[idx, 2024]
+        try:
+            current_price = info.get("regularMarketPrice")
+            if current_price is None:
+                hist = ticker_obj.history(period="1d")
+                current_price = hist["Close"][-1] if not hist.empty else np.nan
+        except Exception:
+            current_price = np.nan
 
 # 📊 Streamlit App
 st.title("📊 Company Stock Valuation Analysis")
@@ -48,6 +56,18 @@ if ticker_input:
         idx = ticker_data[ticker_data == ticker_input].index[0]
 
         st.subheader(f"Details for: {ticker_input}")
+        st.subheader("📊 Key Valuation Inputs")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Last Reported Model Price", f"{model_price_2024:.2f}" if eps_valid else "N/A")
+        c2.metric(
+            "Actual Price",
+            f"{actual_price:.2f}" if not np.isnan(industry_pe_avg) else "N/A",
+        )
+        c3.metric(
+            "Current Price",
+            f"${current_price:.2f}" if not np.isnan(current_price) else "N/A",
+        )
+
         gsubind = gsubind_data[idx]
         st.write("**gsubind:**", f"🧭 {gsubind}")
 
