@@ -683,6 +683,9 @@ with tab3:
                 yaxis_title="Price ($)",
             )
             st.plotly_chart(fig_snap, use_container_width=True)
+        except YFRateLimitError:
+            st.error("⚠️ Too many requests to Yahoo Finance. Please try again later.")
+
         except Exception as e:
             st.error("⚠️ Could not load stock price data.")
             st.exception(e)
