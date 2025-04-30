@@ -587,7 +587,6 @@ with tab3:
                     st.image(logo_url, width=50)
             with col2:
                 st.subheader(f"{company_name} ({ticker_input.upper()})")
-─────────────────────────────────────────────────
         st.subheader("📊 Key Valuation Inputs")
         c1, c2, c3 = st.columns(3)
         c1.metric("Model Price 2024", f"{model_price_2024:.2f}")
