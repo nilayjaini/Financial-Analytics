@@ -42,13 +42,21 @@ years = list(range(2010, 2025))
 st.title(":bar_chart: Company Stock Valuation Analysis")
 ticker_input = st.text_input("Enter Ticker (e.g., AAPL, DELL, TSLA)").upper()
 
+@st.cache_data(ttl=3600)
+def get_current_price(ticker_input):
+    try:
+        ticker_obj = yf.Ticker(ticker_input)
+        return ticker_obj.fast_info['lastPrice']
+    except:
+        return None
+
 if ticker_input:
     if ticker_input in ticker_data.values:
         idx = ticker_data[ticker_data == ticker_input].index[0]
 
         st.subheader(f"Details for: {ticker_input}")
         gsubind = gsubind_data[idx]
-        st.write("**gsubind:**", f"🌍 {gsubind}")
+        st.write("**gsubind:**", f"🗭 {gsubind}")
 
         eps_row = eps_data.loc[idx]
         eps_row = eps_row.mask(eps_row <= 0)
@@ -62,25 +70,14 @@ if ticker_input:
             st.error(f"Ticker '{ticker_input}' not found in 'Analysis' actual price data.")
             st.stop()
 
-        # Fetch current price with fallback
-        try:
-            ticker_obj = yf.Ticker(ticker_input)
-            current_price = ticker_obj.fast_info.get('last_price', None)
-            if current_price is None:
-                hist = ticker_obj.history(period="1d")
-                if not hist.empty:
-                    current_price = hist['Close'].iloc[-1]
-        except Exception:
-            current_price = None
+        current_price = get_current_price(ticker_input)
 
-        # Show model, actual and live prices
         st.subheader(":chart_with_upwards_trend: Price Comparison for 2024")
         col1, col2, col3 = st.columns(3)
-        col1.metric("Model Price (2024)", f"${model_price.get(2024):.2f}" if not pd.isna(model_price.get(2024)) else "N/A")
-        col2.metric("Actual Price (2024)", f"${actual_price.get(2024):.2f}" if not pd.isna(actual_price.get(2024)) else "N/A")
-        col3.metric("Current Stock Price", f"${current_price:.2f}" if current_price else "N/A")
 
-        # (Other analytics and tables would follow here, such as hit rate, gsubind comparison, etc.)
+        col1.metric("Model Price (2024)", f"${model_price[2024]:.2f}" if not pd.isna(model_price.get(2024)) else "N/A")
+        col2.metric("Actual Price (2024)", f"${actual_price[2024]:.2f}" if not pd.isna(actual_price.get(2024)) else "N/A")
+        col3.metric("Current Stock Price", f"${current_price:.2f}" if current_price else "N/A")
 
     else:
         st.warning("Ticker not found. Please check again.")
