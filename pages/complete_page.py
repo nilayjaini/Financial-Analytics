@@ -632,18 +632,18 @@ with tab3:
                      st.image(logo_url, width=50)
              with col2:
                  st.subheader(f"{company_name} ({ticker_input.upper()})")
-            with st.container():
-                st.subheader("📊 Key Valuation Inputs")
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Model Price 2024", f"{model_price_2024:.2f}")
-                c2.metric(
-                    "Actual Price",
-                    f"{actual_price_2024:.2f}" if not np.isnan(industry_pe_avg) else "N/A",
-                )
-                c3.metric(
-                    "Current Price",
-                    f"${current_price:.2f}" if not np.isnan(current_price) else "N/A",
-                )
+             with st.container():
+                 st.subheader("📊 Key Valuation Inputs")
+                 c1, c2, c3 = st.columns(3)
+                 c1.metric("Model Price 2024", f"{model_price_2024:.2f}")
+                 c2.metric(
+                     "Actual Price",
+                     f"{actual_price_2024:.2f}" if not np.isnan(industry_pe_avg) else "N/A",
+                 )
+                 c3.metric(
+                     "Current Price",
+                     f"${current_price:.2f}" if not np.isnan(current_price) else "N/A",
+                 )
         # st.subheader("📊 Key Valuation Inputs")
         # c1, c2, c3 = st.columns(3)
         # c1.metric("Model Price 2024", f"{model_price_2024:.2f}")
