@@ -330,8 +330,11 @@ with tab2:
             # Fetch the last value from the Median P/E Array safely
             median_pe_array = gsubind_to_median_pe.get(gsubind_data[idx], [])
             median_pe_2024 = None
-            if median_pe_array is not None and len(median_pe_array) > 0 and not np.all(np.isnan(median_pe_array)):
-                median_pe_2024 = median_pe_array[-1]
+            if median_pe_array is not None and len(median_pe_array) > 0:
+                median_pe_array = np.array(median_pe_array, dtype=float)
+                if not np.all(np.isnan(median_pe_array)):
+                    median_pe_2024 = median_pe_array[-1]
+                
 
     # Debug: Check values
             st.write("EPS 2024:", eps_2024)
