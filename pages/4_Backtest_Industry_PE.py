@@ -46,6 +46,18 @@ if ticker_input:
         idx = ticker_data[ticker_data == ticker_input].index[0]
 
         st.subheader(f"Details for: {ticker_input}")
+        st.subheader("📊 Key Valuation Inputs")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Last Reported Model Price", f"{model_price_2024:.2f}" if eps_valid else "N/A")
+        c2.metric(
+            "Actual Price",
+            f"{actual_price:.2f}" if not np.isnan(industry_pe_avg) else "N/A",
+        )
+        c3.metric(
+            "Current Price",
+            f"${current_price:.2f}" if not np.isnan(current_price) else "N/A",
+        )
+
         gsubind = gsubind_data[idx]
         st.write("**gsubind:**", f"🧭 {gsubind}")
 
