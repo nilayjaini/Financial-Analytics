@@ -291,3 +291,22 @@ with tab2:
         st.warning("Not enough data to compute hit rate.")
 
     st.dataframe(price_df, use_container_width=True)
+
+
+with tab3:
+    st.title("🏢 Company Snapshot")
+
+    st.markdown(f"### Snapshot for **{ticker_input}**")
+
+    current_price = fetch_current_price(ticker_input)
+    idx = ticker_data[ticker_data == ticker_input].index[0]
+    industry = company_data.loc[idx, "Industry"] if "Industry" in company_data.columns else "N/A"
+    gsubind = gsubind_data[idx]
+
+    st.markdown(f"- **Current Price:** ${current_price:.2f}" if not np.isnan(current_price) else "- **Current Price:** N/A")
+    st.markdown(f"- **Industry:** {industry}")
+    st.markdown(f"- **Gsubind Code:** {gsubind}")
+    st.markdown("---")
+
+    st.markdown("**Note:** This tab uses preloaded Excel data and Alpha Vantage's current price API. No live fundamentals shown due to API limits.")
+
