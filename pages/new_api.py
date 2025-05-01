@@ -225,3 +225,132 @@ with tab1:
             st.warning("⚠️ Not enough valid peer data to create a proper visualization.")
     else:
         st.error("❌ Ticker not found. Please check your selection.")
+
+
+with tab2:
+    st.title("📊 Backtest")
+
+    if ticker_input:
+        st.subheader(f"Backtesting Strategy for {ticker_input}")
+
+        # Fetch historical data
+        def fetch_historical_data(symbol):
+            base_url = 'https://www.alphavantage.co/query'
+            params = {
+                'function': 'TIME_SERIES_DAILY_ADJUSTED',
+                'symbol': symbol,
+                'outputsize': 'full',
+                'apikey': API_KEY
+            }
+            try:
+                response = requests.get(base_url, params=params)
+                data = response.json()
+                time_series = data.get('Time Series (Daily)', {})
+                df = pd.DataFrame.from_dict(time_series, orient='index')
+                df = df.rename(columns={
+                    '1. open': 'Open',
+                    '2. high': 'High',
+                    '3. low': 'Low',
+                    '4. close': 'Close',
+                    '5. adjusted close': 'Adj Close',
+                    '6. volume': 'Volume'
+                })
+                df.index = pd.to_datetime(df.index)
+                df = df.sort_index()
+                df = df.astype(float)
+                return df
+            except Exception as e:
+                st.error(f"Error fetching historical data: {e}")
+                return pd.DataFrame()
+
+        hist_data = fetch_historical_data(ticker_input)
+
+        if not hist_data.empty:
+            # Simple Moving Average Strategy
+            hist_data['SMA50'] = hist_data['Adj Close'].rolling(window=50).mean()
+            hist_data['SMA200'] = hist_data['Adj Close'].rolling(window=200).mean()
+
+            # Generate signals
+            hist_data['Signal'] = 0.0
+            hist_data['Signal'][50:] = np.where(hist_data['SMA50'][50:] > hist_data['SMA200'][50:], 1.0, 0.0)
+            hist_data['Position'] = hist_data['Signal'].diff()
+
+            # Plotting
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=hist_data.index, y=hist_data['Adj Close'], mode='lines', name='Adj Close'))
+            fig.add_trace(go.Scatter(x=hist_data.index, y=hist_data['SMA50'], mode='lines', name='SMA50'))
+            fig.add_trace(go.Scatter(x=hist_data.index, y=hist_data['SMA200'], mode='lines', name='SMA200'))
+
+            # Buy signals
+            buy_signals = hist_data[hist_data['Position'] == 1.0]
+            fig.add_trace(go.Scatter(x=buy_signals.index, y=buy_signals['Adj Close'],
+                                     mode='markers', name='Buy Signal', marker_symbol='triangle-up', marker_color='green'))
+
+            # Sell signals
+            sell_signals = hist_data[hist_data['Position'] == -1.0]
+            fig.add_trace(go.Scatter(x=sell_signals.index, y=sell_signals['Adj Close'],
+                                     mode='markers', name='Sell Signal', marker_symbol='triangle-down', marker_color='red'))
+
+            fig.update_layout(title=f"{ticker_input} Backtesting Strategy",
+                              xaxis_title='Date',
+                              yaxis_title='Price',
+                              legend_title='Legend')
+            st.plotly_chart(fig)
+
+            # Display strategy performance
+            st.subheader("Strategy Performance")
+            initial_capital = 10000.0
+            positions = pd.DataFrame(index=hist_data.index).fillna(0.0)
+            positions[ticker_input] = 100 * hist_data['Signal']
+            portfolio = positions.multiply(hist_data['Adj Close'], axis=0)
+            pos_diff = positions.diff()
+            portfolio['holdings'] = (positions.multiply(hist_data['Adj Close'], axis=0)).sum(axis=1)
+            portfolio['cash'] = initial_capital - (pos_diff.multiply(hist_data['Adj Close'], axis=0)).sum(axis=1).cumsum()
+            portfolio['total'] = portfolio['cash'] + portfolio['holdings']
+            portfolio['returns'] = portfolio['total'].pct_change()
+
+            st.line_chart(portfolio['total'])
+        else:
+            st.warning("Historical data is not available for this ticker.")
+
+
+
+with tab3:
+    st.title("🏢 Company Snapshot")
+
+    if ticker_input:
+        st.subheader(f"Company Overview: {ticker_input}")
+
+        # Fetch company overview
+        def fetch_company_overview(symbol):
+            base_url = 'https://www.alphavantage.co/query'
+            params = {
+                'function': 'OVERVIEW',
+                'symbol': symbol,
+                'apikey': API_KEY
+            }
+            try:
+                response = requests.get(base_url, params=params)
+                data = response.json()
+                return data
+            except Exception as e:
+                st.error(f"Error fetching company overview: {e}")
+                return {}
+
+        overview = fetch_company_overview(ticker_input)
+
+        if overview:
+            st.markdown(f"**Name:** {overview.get('Name', 'N/A')}")
+            st.markdown(f"**Sector:** {overview.get('Sector', 'N/A')}")
+            st.markdown(f"**Industry:** {overview.get('Industry', 'N/A')}")
+            st.markdown(f"**Market Capitalization:** {overview.get('MarketCapitalization', 'N/A')}")
+            st.markdown(f"**EPS:** {overview.get('EPS', 'N/A')}")
+            st.markdown(f"**PE Ratio:** {overview.get('PERatio', 'N/A')}")
+            st.markdown(f"**Dividend Yield:** {overview.get('DividendYield', 'N/A')}")
+            st.markdown(f"**52 Week High:** {overview.get('52WeekHigh', 'N/A')}")
+            st.markdown(f"**52 Week Low:** {overview.get('52WeekLow', 'N/A')}")
+            st.markdown(f"**Description:** {overview.get('Description', 'N/A')}")
+        else:
+            st.warning("Company overview data is not available.")
+
+
