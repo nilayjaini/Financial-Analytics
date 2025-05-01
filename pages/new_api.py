@@ -227,9 +227,7 @@ with tab1:
         st.error("❌ Ticker not found. Please check your selection.")
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # Tab 2 – Backtest
-# ═════════════════════════════════════════════════════════════════════════════
 with tab2:
     st.title("📊 Company Stock Valuation Analysis")
 
@@ -239,38 +237,23 @@ with tab2:
         industry = company_data.loc[idx, "Industry"]
 
         # ── Logo & header using Alpha Vantage ───────────────────────────────
-    def fetch_company_overview(symbol):
-        url = "https://www.alphavantage.co/query"
-        params = {
-            "function": "OVERVIEW",
-            "symbol": symbol,
-            "apikey": API_KEY
-        }
-    try:
-        r = requests.get(url, params=params)
-        return r.json()
-        except:
-            return {}
-    info = fetch_company_overview(ticker_input)
-    website = info.get("Website", "")
-    domain = urllib.parse.urlparse(website).netloc
-    logo_url = f"https://logo.clearbit.com/{domain}" if domain else None
+        def fetch_company_overview(symbol):
+            url = "https://www.alphavantage.co/query"
+            params = {
+                "function": "OVERVIEW",
+                "symbol": symbol,
+                "apikey": API_KEY
+            }
+            try:
+                r = requests.get(url, params=params)
+                return r.json()
+            except:
+                return {}
 
-        except YFRateLimitError:
-            st.error("⚠️ Unable to fetch data from Yahoo Finance due to rate limits. Please try again later.")
-            info = {}
-            logo_url = None
-        except Exception as e:
-            st.error(f"⚠️ An unexpected error occurred: {str(e)}")
-            info = {}
-            logo_url = None
-        # ticker_obj = yf.Ticker(ticker_input.upper())
-        # info = ticker_obj.info
-        # website = info.get("website", "")
-        # domain = urllib.parse.urlparse(website).netloc
-        # logo_url = info.get("logo_url") or (
-        #     f"https://logo.clearbit.com/{domain}" if domain else None
-        # )
+        info = fetch_company_overview(ticker_input)
+        website = info.get("Website", "")
+        domain = urllib.parse.urlparse(website).netloc
+        logo_url = f"https://logo.clearbit.com/{domain}" if domain else None
 
         col1, col2 = st.columns([1, 6])
         with col1:
@@ -278,8 +261,9 @@ with tab2:
                 st.image(logo_url, width=50)
         with col2:
             st.subheader(f"Details for: {ticker_input}")
+
         try:
-    # Get relevant price data
+            # Get relevant price data
             eps_2024 = eps_data.loc[idx, 2024] if 2024 in eps_data.columns else None
             # Fetch the last value from the Median P/E Array safely
             median_pe_array = gsubind_to_median_pe.get(gsubind_data[idx], [])
@@ -288,15 +272,15 @@ with tab2:
                 median_pe_array = np.array(median_pe_array, dtype=float)
                 if not np.all(np.isnan(median_pe_array)):
                     median_pe_2024 = median_pe_array[-1]
-                
 
-    # Calculate model price
+            # Calculate model price
             model_price_2024 = None
             if eps_2024 is not None and median_pe_2024 is not None:
                 model_price_2024 = float(eps_2024) * float(median_pe_2024)
 
-    # Fetch actual price and current price
+            # Fetch actual price and current price
             actual_price_2024 = actual_price_data.loc[ticker_input, 2024] if 2024 in actual_price_data.columns else None
+
             def fetch_current_price(symbol):
                 url = "https://www.alphavantage.co/query"
                 params = {
@@ -308,8 +292,9 @@ with tab2:
                     r = requests.get(url, params=params)
                     data = r.json()
                     return float(data["Global Quote"]["05. price"])
-                    except:
-                        return np.nan
+                except:
+                    return np.nan
+
             current_price = fetch_current_price(ticker_input)
 
             # Display metrics
@@ -321,7 +306,6 @@ with tab2:
         except Exception as e:
             st.error("⚠️ Could not calculate key valuation inputs.")
             st.exception(e)
-            
 
         st.write(f"**Industry:** {industry}")
 
@@ -349,17 +333,16 @@ with tab2:
 
         # ── Interactive price comparison ────────────────────────────
         st.subheader(f"📈 {ticker_input}: Model vs Actual Price (t → t + 1)")
-        
+
         # x-axis for each series
         x_actual = price_df["Year"]                      # t
         y_actual = price_df["Actual Price"]
-        
+
         x_model  = x_actual + 1                          # t + 1
         y_model  = price_df["Model Price"]
-        
-        import plotly.graph_objects as go
+
         fig_bt = go.Figure()
-        
+
         # Model (predicted for next year)
         fig_bt.add_trace(
             go.Scatter(
@@ -371,7 +354,7 @@ with tab2:
                 line=dict(width=2),
             )
         )
-        
+
         # Actual (realised in year t)
         fig_bt.add_trace(
             go.Scatter(
@@ -383,7 +366,7 @@ with tab2:
                 line=dict(width=2, dash="dash"),
             )
         )
-        
+
         # Layout tweaks
         fig_bt.update_layout(
             height=450,
@@ -400,7 +383,7 @@ with tab2:
             ),
             margin=dict(l=40, r=40, t=40, b=40),
         )
-        
+
         st.plotly_chart(fig_bt, use_container_width=True)
 
         # ── Hit-rate calculation ────────────────────────────────────
@@ -470,131 +453,6 @@ with tab2:
                 conf_band = np.nanmedian(errors)
                 st.markdown(f"• **Typical {industry} model error:** ±{conf_band:.1f}%")
             else:
-                st.markdown(
-                    "• _(Not enough data to compute sub-industry confidence band)_"
-                )
 
-            st.caption(
-                "🔍 *Note: This is a point-in-time signal based solely on trailing EPS × median PE. "
-                "Consider forward-looking estimates, volatility, and macro factors before making any trade.*"
-            )
-        else:
-            st.warning("Prediction for 2024 not available.")
-
-        # ── Industry average hit rate ─────────────────────────────────
-        peer_indices = gsubind_data[gsubind_data == gsubind].index
-        gsubind_total = gsubind_correct = 0
-        for peer_idx in peer_indices:
-            peer_tkr = ticker_data[peer_idx]
-            if peer_tkr not in actual_price_data.index:
-                continue
-            peer_eps = eps_data.loc[peer_idx].mask(eps_data.loc[peer_idx] <= 0)
-            peer_actual = actual_price_data.loc[peer_tkr]
-            peer_median = pd.Series(
-                gsubind_to_median_pe.get(gsubind, [None] * len(years)), index=years
-            )
-            peer_model = peer_eps * peer_median
-            for year in range(2010, 2024):
-                if pd.isna(peer_model.get(year)):
-                    continue
-                peer_pred = "Up" if peer_model[year] > peer_actual[year] else "Down"
-
-                if (
-                    year + 1 in peer_actual.index
-                    and pd.notna(peer_actual.get(year + 1))
-                ):
-                    n1 = "Up" if peer_actual[year + 1] > peer_actual[year] else "Down"
-                    if peer_pred == n1:
-                        gsubind_correct += 1
-                    gsubind_total += 1
-
-                if (
-                    year + 2 in peer_actual.index
-                    and pd.notna(peer_actual.get(year + 2))
-                ):
-                    n2 = "Up" if peer_actual[year + 2] > peer_actual[year] else "Down"
-                    if peer_pred == n2:
-                        gsubind_correct += 1
-                    gsubind_total += 1
-
-        gsubind_hit_rate = (
-            gsubind_correct / gsubind_total * 100 if gsubind_total else np.nan
-        )
-        st.subheader(f"🏆 {industry} Industry Hit Rate Comparison")
-        st.markdown(f"**Your Stock Hit Rate:** {overall_hit_rate:.2f}%")
-        if not np.isnan(gsubind_hit_rate):
-            st.success(f"🏆 Industry Average Hit Rate: **{gsubind_hit_rate:.2f}%**")
-        else:
-            st.warning("Not enough data for gsubind hit rate.")
-        st.markdown(
-            f"""
-**What this means:**  
-This number (📊 **{gsubind_hit_rate:.2f}%**) is the **average** one-year (and two-year) directional hit rate of our simple EPS×PE
-model across *all* members of the **{industry}** industry.  
-A higher value here means the model tends to work well for this industry; a lower value suggests it’s closer to a coin-flip.
-"""
-        )
-
-        # ── Global model accuracy ─────────────────────────────────────
-        global_total = global_correct = 0
-        for peer_idx in range(len(ticker_data)):
-            peer_tkr = ticker_data[peer_idx]
-            peer_sub = gsubind_data[peer_idx]
-            if peer_tkr not in actual_price_data.index:
-                continue
-            peer_eps = eps_data.loc[peer_idx].mask(eps_data.loc[peer_idx] <= 0)
-            peer_actual = actual_price_data.loc[peer_tkr]
-            peer_median = pd.Series(
-                gsubind_to_median_pe.get(peer_sub, [None] * len(years)), index=years
-            )
-            peer_model = peer_eps * peer_median
-            for year in range(2010, 2024):
-                if pd.isna(peer_model.get(year)):
-                    continue
-                peer_pred = "Up" if peer_model[year] > peer_actual[year] else "Down"
-
-                if (
-                    year + 1 in peer_actual.index
-                    and pd.notna(peer_actual.get(year + 1))
-                ):
-                    nn1 = (
-                        "Up"
-                        if peer_actual[year + 1] > peer_actual[year]
-                        else "Down"
-                    )
-                    if peer_pred == nn1:
-                        global_correct += 1
-                    global_total += 1
-
-                if (
-                    year + 2 in peer_actual.index
-                    and pd.notna(peer_actual.get(year + 2))
-                ):
-                    nn2 = (
-                        "Up"
-                        if peer_actual[year + 2] > peer_actual[year]
-                        else "Down"
-                    )
-                    if peer_pred == nn2:
-                        global_correct += 1
-                    global_total += 1
-
-        global_hit_rate = (
-            global_correct / global_total * 100 if global_total else np.nan
-        )
-        st.subheader(
-            "🌍 Overall Model Accuracy (All Stocks considered in the Prototype Universe)"
-        )
-        if not np.isnan(global_hit_rate):
-            st.success(f"🌟 Global Model Accuracy: **{global_hit_rate:.2f}%**")
-        else:
-            st.warning("Not enough data to calculate global model accuracy.")
-        st.markdown(
-            f"""
-**Why this matters:**  
-The **Global Model Accuracy** of **{global_hit_rate:.2f}%** measures how often our simple EPS × PE
-price-direction model would have correctly predicted next-year (and two-year) moves if applied to **every single stock** in our prototype universe.
-"""
-        )
-    else:
-        st.error("❌ Ticker not found. Please check your selection.")
+::contentReference[oaicite:11]{index=11}
+ 
