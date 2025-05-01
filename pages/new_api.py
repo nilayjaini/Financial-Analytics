@@ -229,128 +229,65 @@ with tab1:
 
 with tab2:
     st.title("📊 Backtest")
+    st.subheader(f"Backtesting Strategy for {ticker_input}")
 
-    if ticker_input:
-        st.subheader(f"Backtesting Strategy for {ticker_input}")
+    if ticker_input not in actual_price_data.index:
+        st.warning("Historical data is not available for this ticker.")
+        st.stop()
 
-        # Fetch historical data
-        def fetch_historical_data(symbol):
-            base_url = 'https://www.alphavantage.co/query'
-            params = {
-                'function': 'TIME_SERIES_DAILY_ADJUSTED',
-                'symbol': symbol,
-                'outputsize': 'full',
-                'apikey': API_KEY
-            }
-            try:
-                response = requests.get(base_url, params=params)
-                data = response.json()
-                time_series = data.get('Time Series (Daily)', {})
-                df = pd.DataFrame.from_dict(time_series, orient='index')
-                df = df.rename(columns={
-                    '1. open': 'Open',
-                    '2. high': 'High',
-                    '3. low': 'Low',
-                    '4. close': 'Close',
-                    '5. adjusted close': 'Adj Close',
-                    '6. volume': 'Volume'
-                })
-                df.index = pd.to_datetime(df.index)
-                df = df.sort_index()
-                df = df.astype(float)
-                return df
-            except Exception as e:
-                st.error(f"Error fetching historical data: {e}")
-                return pd.DataFrame()
+    idx = ticker_data[ticker_data == ticker_input].index[0]
+    gsubind = gsubind_data[idx]
 
-        hist_data = fetch_historical_data(ticker_input)
+    eps_row = eps_data.loc[idx].mask(eps_data.loc[idx] <= 0)
+    median_pe_row = pd.Series(gsubind_to_median_pe.get(gsubind, [None]*len(years)), index=years)
+    model_price = eps_row * median_pe_row
+    actual_price = actual_price_data.loc[ticker_input]
 
-        if not hist_data.empty:
-            # Simple Moving Average Strategy
-            hist_data['SMA50'] = hist_data['Adj Close'].rolling(window=50).mean()
-            hist_data['SMA200'] = hist_data['Adj Close'].rolling(window=200).mean()
+    price_df = pd.DataFrame({
+        "Year": years,
+        "EPS": eps_row.values,
+        "Median PE": median_pe_row.values,
+        "Model Price": model_price.values,
+        "Actual Price": actual_price.values
+    })
+    price_df["Prediction"] = np.where(model_price > actual_price, "Up", "Down")
 
-            # Generate signals
-            hist_data['Signal'] = 0.0
-            hist_data['Signal'][50:] = np.where(hist_data['SMA50'][50:] > hist_data['SMA200'][50:], 1.0, 0.0)
-            hist_data['Position'] = hist_data['Signal'].diff()
+    st.markdown("### 📈 Model vs Actual Price (t → t+1)")
 
-            # Plotting
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=hist_data.index, y=hist_data['Adj Close'], mode='lines', name='Adj Close'))
-            fig.add_trace(go.Scatter(x=hist_data.index, y=hist_data['SMA50'], mode='lines', name='SMA50'))
-            fig.add_trace(go.Scatter(x=hist_data.index, y=hist_data['SMA200'], mode='lines', name='SMA200'))
+    x_actual = price_df["Year"]
+    y_actual = price_df["Actual Price"]
+    x_model = x_actual + 1
+    y_model = price_df["Model Price"]
 
-            # Buy signals
-            buy_signals = hist_data[hist_data['Position'] == 1.0]
-            fig.add_trace(go.Scatter(x=buy_signals.index, y=buy_signals['Adj Close'],
-                                     mode='markers', name='Buy Signal', marker_symbol='triangle-up', marker_color='green'))
+    fig_bt = go.Figure()
+    fig_bt.add_trace(go.Scatter(x=x_model, y=y_model, mode="lines+markers", name="Model (t→t+1)"))
+    fig_bt.add_trace(go.Scatter(x=x_actual, y=y_actual, mode="lines+markers", name="Actual (t)"))
+    fig_bt.update_layout(height=400, xaxis_title="Year", yaxis_title="Price ($)", hovermode="x unified")
+    st.plotly_chart(fig_bt, use_container_width=True)
 
-            # Sell signals
-            sell_signals = hist_data[hist_data['Position'] == -1.0]
-            fig.add_trace(go.Scatter(x=sell_signals.index, y=sell_signals['Adj Close'],
-                                     mode='markers', name='Sell Signal', marker_symbol='triangle-down', marker_color='red'))
+    # Hit rate logic
+    total = correct = 0
+    for year in range(2010, 2024):
+        if pd.isna(model_price.get(year)) or pd.isna(actual_price.get(year)):
+            continue
+        pred = "Up" if model_price[year] > actual_price[year] else "Down"
 
-            fig.update_layout(title=f"{ticker_input} Backtesting Strategy",
-                              xaxis_title='Date',
-                              yaxis_title='Price',
-                              legend_title='Legend')
-            st.plotly_chart(fig)
+        if year + 1 in actual_price.index and pd.notna(actual_price.get(year + 1)):
+            actual_move = "Up" if actual_price[year + 1] > actual_price[year] else "Down"
+            if pred == actual_move:
+                correct += 1
+            total += 1
 
-            # Display strategy performance
-            st.subheader("Strategy Performance")
-            initial_capital = 10000.0
-            positions = pd.DataFrame(index=hist_data.index).fillna(0.0)
-            positions[ticker_input] = 100 * hist_data['Signal']
-            portfolio = positions.multiply(hist_data['Adj Close'], axis=0)
-            pos_diff = positions.diff()
-            portfolio['holdings'] = (positions.multiply(hist_data['Adj Close'], axis=0)).sum(axis=1)
-            portfolio['cash'] = initial_capital - (pos_diff.multiply(hist_data['Adj Close'], axis=0)).sum(axis=1).cumsum()
-            portfolio['total'] = portfolio['cash'] + portfolio['holdings']
-            portfolio['returns'] = portfolio['total'].pct_change()
+        if year + 2 in actual_price.index and pd.notna(actual_price.get(year + 2)):
+            actual_move_2 = "Up" if actual_price[year + 2] > actual_price[year] else "Down"
+            if pred == actual_move_2:
+                correct += 1
+            total += 1
 
-            st.line_chart(portfolio['total'])
-        else:
-            st.warning("Historical data is not available for this ticker.")
+    if total > 0:
+        hit_rate = correct / total * 100
+        st.success(f"✅ Overall Backtest Hit Rate: {hit_rate:.2f}%")
+    else:
+        st.warning("Not enough data to compute hit rate.")
 
-
-
-with tab3:
-    st.title("🏢 Company Snapshot")
-
-    if ticker_input:
-        st.subheader(f"Company Overview: {ticker_input}")
-
-        # Fetch company overview
-        def fetch_company_overview(symbol):
-            base_url = 'https://www.alphavantage.co/query'
-            params = {
-                'function': 'OVERVIEW',
-                'symbol': symbol,
-                'apikey': API_KEY
-            }
-            try:
-                response = requests.get(base_url, params=params)
-                data = response.json()
-                return data
-            except Exception as e:
-                st.error(f"Error fetching company overview: {e}")
-                return {}
-
-        overview = fetch_company_overview(ticker_input)
-
-        if overview:
-            st.markdown(f"**Name:** {overview.get('Name', 'N/A')}")
-            st.markdown(f"**Sector:** {overview.get('Sector', 'N/A')}")
-            st.markdown(f"**Industry:** {overview.get('Industry', 'N/A')}")
-            st.markdown(f"**Market Capitalization:** {overview.get('MarketCapitalization', 'N/A')}")
-            st.markdown(f"**EPS:** {overview.get('EPS', 'N/A')}")
-            st.markdown(f"**PE Ratio:** {overview.get('PERatio', 'N/A')}")
-            st.markdown(f"**Dividend Yield:** {overview.get('DividendYield', 'N/A')}")
-            st.markdown(f"**52 Week High:** {overview.get('52WeekHigh', 'N/A')}")
-            st.markdown(f"**52 Week Low:** {overview.get('52WeekLow', 'N/A')}")
-            st.markdown(f"**Description:** {overview.get('Description', 'N/A')}")
-        else:
-            st.warning("Company overview data is not available.")
-
-
+    st.dataframe(price_df, use_container_width=True)
